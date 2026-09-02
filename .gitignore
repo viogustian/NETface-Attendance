@@ -1,0 +1,21 @@
+# .NET build and tooling
+[Bb]in/
+[Oo]bj/
+TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# JavaScript tooling and build output
+node_modules/
+dist/
+coverage/
+*.local
+
+# Local configuration and operating-system files
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
