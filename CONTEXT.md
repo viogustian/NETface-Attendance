@@ -8,6 +8,10 @@ This context defines the language of the employee-attendance system. It covers e
 A person recorded by the organization for attendance purposes. An employee has an employee code, profile details, employment status, administrative flag, and zero or more face embeddings.
 _Avoid_: User, account, staff record
 
+**Employee status**:
+The active state of an employee: `Active` or `Inactive`. Inactive employees cannot mark attendance.
+_Avoid_: Account status
+
 **Employee code**:
 The identifier used to refer to an employee in attendance and recognition records.
 _Avoid_: User ID, badge ID
@@ -19,11 +23,11 @@ _Avoid_: Face enrollment, biometric setup
 ## Attendance
 
 **Attendance session**:
-A department-scoped attendance period on a date. It contains attendance entries and has a finalization state.
+A department-scoped attendance period on a date. It contains attendance entries. A session's lifecycle states are: `NotStarted`, `Active`, `Finalized`, and `Cancelled`.
 _Avoid_: Meeting, event
 
 **Attendance entry**:
-An attendance record within one attendance session, retaining the employee code and employee name recorded at marking time.
+An attendance record within one attendance session. It holds a reference to the employee identity (`EmployeeId`) and retains a snapshot of the employee code and employee name recorded at marking time.
 _Avoid_: Check-in, presence record
 
 **Attendance status**:
