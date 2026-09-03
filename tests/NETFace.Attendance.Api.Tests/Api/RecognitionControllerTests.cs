@@ -42,6 +42,12 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
                 services.AddDbContext<AppDbContext>(options =>
                     options.UseInMemoryDatabase(dbName));
 
+                // Mock IFaceMatchingService to avoid OnnxSessionManager throwing FileNotFoundException in test environment
+                var matchingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceMatchingService));
+                if (matchingSvcDescriptor is not null)
+                    services.Remove(matchingSvcDescriptor);
+                services.AddScoped<IFaceMatchingService, DummyFaceMatchingService>();
+
                 configureServices?.Invoke(services);
             });
         });
@@ -387,7 +393,7 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
     {
         public Task<FaceDetectionResult> DetectFacesAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new FaceDetectionResult(FaceDetected: false, FaceCount: 0));
+            return Task.FromResult(new FaceDetectionResult(faceDetected: false, faceCount: 0));
         }
     }
 

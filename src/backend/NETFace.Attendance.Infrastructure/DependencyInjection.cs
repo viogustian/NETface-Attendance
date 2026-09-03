@@ -19,7 +19,7 @@ public static class DependencyInjection
         services.AddSingleton(options);
         services.AddScoped<IFaceDetectionService, DummyFaceDetectionService>();
         services.AddScoped<IFaceEmbeddingExtractor, DummyFaceEmbeddingExtractor>();
-        services.AddScoped<IFaceMatchingService, DummyFaceMatchingService>();
+        services.AddScoped<IFaceMatchingService, YuNetFaceMatchingService>();
         services.AddScoped<IRecognitionAttendanceService, RecognitionAttendanceService>();
 
         if (configuration != null)

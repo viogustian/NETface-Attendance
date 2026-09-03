@@ -10,9 +10,14 @@ public class DummyFaceDetectionService : IFaceDetectionService
     {
         if (imageBytes == null || imageBytes.Length == 0)
         {
-            return Task.FromResult(new FaceDetectionResult(FaceDetected: false, FaceCount: 0));
+            return Task.FromResult(new FaceDetectionResult(faceDetected: false, faceCount: 0));
         }
 
-        return Task.FromResult(new FaceDetectionResult(FaceDetected: true, FaceCount: 1));
+        return Task.FromResult(new FaceDetectionResult(faceDetected: true, faceCount: 1));
+    }
+
+    public Task<FaceDetectionResult> DetectFacesAsync(Stream imageStream, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(new FaceDetectionResult(faceDetected: true, faceCount: 1));
     }
 }

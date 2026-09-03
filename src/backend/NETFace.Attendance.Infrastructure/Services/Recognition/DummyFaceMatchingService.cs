@@ -82,4 +82,22 @@ public class DummyFaceMatchingService : IFaceMatchingService
             matchedEmployeeId.HasValue ? minDistance : double.PositiveInfinity,
             isMatch ? matchedEmployeeId : null);
     }
+
+    public FaceDetectionResult DetectFace(byte[] imageBytes)
+    {
+        // Dummy implementation
+        return new FaceDetectionResult(true, 1)
+        {
+            FaceDetected = true,
+            Success = true,
+            BoundingBox = new float[] { 10, 10, 100, 100 },
+            Landmarks = new float[][] {
+                new float[] { 30, 30 },
+                new float[] { 70, 30 },
+                new float[] { 50, 50 },
+                new float[] { 40, 80 },
+                new float[] { 60, 80 }
+            }
+        };
+    }
 }
