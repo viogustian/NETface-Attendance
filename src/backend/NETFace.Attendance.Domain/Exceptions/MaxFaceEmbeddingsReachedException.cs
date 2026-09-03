@@ -1,8 +1,9 @@
 namespace NETFace.Attendance.Domain.Exceptions;
 
-public class MaxFaceEmbeddingsReachedException : DomainException
+public class MaxFaceEmbeddingsReachedException : Exception
 {
-    public MaxFaceEmbeddingsReachedException(string message) : base(message)
+    public MaxFaceEmbeddingsReachedException()
+        : base("An employee cannot have more than 5 face embeddings.")
     {
     }
 }

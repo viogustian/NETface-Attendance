@@ -9,9 +9,11 @@ builder.Services.AddControllers();
 // Register Recognition Services (dummy services for ML/AI abstraction)
 builder.Services.AddRecognitionServices(builder.Configuration);
 
-// We register DbContext here.
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Host=localhost;Database=NETFace_Attendance;Username=postgres;Password=postgres"));
+    options.UseNpgsql(connectionString));
 
 var app = builder.Build();
 
@@ -19,4 +21,5 @@ app.MapControllers();
 
 app.Run();
 
+// Expose Program as a partial class for WebApplicationFactory in tests
 public partial class Program { }

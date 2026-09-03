@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Threading.Tasks;
+
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,42 +15,72 @@ public class EmployeesControllerTests : IClassFixture<WebApplicationFactory<Prog
 
     public EmployeesControllerTests(WebApplicationFactory<Program> factory)
     {
-        _factory = factory.WithWebHostBuilder(builder =>
+        _factory = factory;
+    }
+
+    private HttpClient CreateClientWithIsolatedDb()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        return _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
-                if (descriptor != null)
-                {
+                // Remove existing DbContext registration
+                var descriptor = services.SingleOrDefault(
+                    d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+                if (descriptor is not null)
                     services.Remove(descriptor);
-                }
 
+                // Use unique in-memory DB per test
                 services.AddDbContext<AppDbContext>(options =>
-                {
-                    options.UseInMemoryDatabase("InMemoryDbForTesting");
-                });
+                    options.UseInMemoryDatabase(dbName));
             });
-        });
+        }).CreateClient();
     }
 
     [Fact]
     public async Task CreateEmployee_ReturnsCreatedEmployee()
     {
-        // Arrange
-        var client = _factory.CreateClient();
-        var request = new
+        var client = CreateClientWithIsolatedDb();
+
+        var response = await client.PostAsJsonAsync("/api/employees", new
         {
-            EmployeeCode = "TEST-001",
-            ProfileDetails = "Test Employee",
-            AdminFlag = false
-        };
+            employeeCode = "EMP001",
+            fullName = "Alice Wonderland",
+            isAdmin = false,
+        });
 
-        // Act
-        var response = await client.PostAsJsonAsync("/api/employees", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        // Assert
-        response.EnsureSuccessStatusCode();
-        var responseString = await response.Content.ReadAsStringAsync();
-        Assert.Contains("TEST-001", responseString);
+        var body = await response.Content.ReadFromJsonAsync<EmployeeResponse>();
+        Assert.NotNull(body);
+        Assert.Equal("EMP001", body.EmployeeCode);
+        Assert.Equal("Alice Wonderland", body.FullName);
     }
+
+    [Fact]
+    public async Task ListEmployees_ReturnsOkWithEmployees()
+    {
+        var client = CreateClientWithIsolatedDb();
+
+        // Seed one employee first
+        await client.PostAsJsonAsync("/api/employees", new
+        {
+            employeeCode = "EMP002",
+            fullName = "Bob Builder",
+            isAdmin = false,
+        });
+
+        var response = await client.GetAsync("/api/employees");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var employees = await response.Content.ReadFromJsonAsync<List<EmployeeResponse>>();
+        Assert.NotNull(employees);
+        Assert.Single(employees);
+        Assert.Equal("EMP002", employees[0].EmployeeCode);
+    }
+
+    // DTO mirror for assertion (avoids referencing Api DTOs directly)
+    private record EmployeeResponse(Guid Id, string EmployeeCode, string FullName, bool IsAdmin, string Status);
 }

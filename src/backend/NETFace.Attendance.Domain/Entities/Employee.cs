@@ -7,34 +7,37 @@ namespace NETFace.Attendance.Domain.Entities;
 
 public class Employee
 {
-    public Guid Id { get; private set; }
-    public string EmployeeCode { get; private set; } = string.Empty;
-    public string ProfileDetails { get; private set; } = string.Empty;
-    public EmployeeStatus Status { get; private set; }
-    public bool AdminFlag { get; private set; }
+    private const int MaxEmbeddings = 5;
 
     private readonly List<FaceEmbedding> _faceEmbeddings = new();
+
+    public Guid Id { get; private set; }
+    public string EmployeeCode { get; private set; }
+    public string FullName { get; private set; }
+    public EmployeeStatus Status { get; private set; }
+    public bool IsAdmin { get; private set; }
     public IReadOnlyCollection<FaceEmbedding> FaceEmbeddings => _faceEmbeddings.AsReadOnly();
 
     // EF Core constructor
-    private Employee() { }
+    private Employee() { Id = Guid.NewGuid(); EmployeeCode = string.Empty; FullName = string.Empty; }
 
-    public Employee(string employeeCode, string profileDetails, bool adminFlag)
+    public Employee(string employeeCode, string fullName, bool isAdmin)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(employeeCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
+
         Id = Guid.NewGuid();
-        EmployeeCode = employeeCode ?? throw new ArgumentNullException(nameof(employeeCode));
-        ProfileDetails = profileDetails ?? throw new ArgumentNullException(nameof(profileDetails));
-        AdminFlag = adminFlag;
+        EmployeeCode = employeeCode;
+        FullName = fullName;
+        IsAdmin = isAdmin;
         Status = EmployeeStatus.Active;
     }
 
     public void AddFaceEmbedding(float[] vector)
     {
-        if (_faceEmbeddings.Count >= 5)
-        {
+        if (_faceEmbeddings.Count >= MaxEmbeddings)
             throw new MaxFaceEmbeddingsReachedException("An employee can have a maximum of 5 face embeddings.");
-        }
-        
+
         _faceEmbeddings.Add(new FaceEmbedding(this.Id, vector));
     }
 }
