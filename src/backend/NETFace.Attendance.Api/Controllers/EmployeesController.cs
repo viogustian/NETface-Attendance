@@ -24,9 +24,20 @@ public class EmployeesController : ControllerBase
     public async Task<IActionResult> Create(CreateEmployeeRequest request)
     {
         var employee = new Employee(request.EmployeeCode, request.ProfileDetails, request.AdminFlag);
-        
+
         _context.Employees.Add(employee);
-        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+            when (ex.InnerException?.Message.Contains("unique", StringComparison.OrdinalIgnoreCase) == true
+               || ex.InnerException?.Message.Contains("IX_", StringComparison.OrdinalIgnoreCase) == true
+               || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return Conflict(new { error = "An employee with this employee code already exists." });
+        }
 
         var response = new EmployeeResponse(
             employee.Id,
@@ -65,7 +76,6 @@ public class EmployeesController : ControllerBase
     public async Task<IActionResult> List()
     {
         var employees = await _context.Employees
-            .Include(e => e.FaceEmbeddings)
             .Select(e => new EmployeeResponse(
                 e.Id,
                 e.EmployeeCode,
