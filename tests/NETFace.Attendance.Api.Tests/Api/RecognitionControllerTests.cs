@@ -47,6 +47,12 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
                 if (matchingSvcDescriptor is not null)
                     services.Remove(matchingSvcDescriptor);
                 services.AddScoped<IFaceMatchingService, DummyFaceMatchingService>();
+                
+                // Mock IFaceEmbeddingExtractor as well to avoid real SFace extraction
+                var embeddingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceEmbeddingExtractor));
+                if (embeddingSvcDescriptor is not null)
+                    services.Remove(embeddingSvcDescriptor);
+                services.AddScoped<IFaceEmbeddingExtractor, DummyFaceEmbeddingExtractor>();
 
                 configureServices?.Invoke(services);
             });

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Options;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using NETFace.Attendance.Application.Interfaces;
@@ -14,12 +15,12 @@ namespace NETFace.Attendance.Infrastructure.Services.Recognition;
 public class YuNetFaceMatchingService : IFaceMatchingService
 {
     private readonly IOnnxSessionManager _sessionManager;
-    private readonly double _defaultThreshold;
+    private readonly IOptionsMonitor<FaceMatchingOptions> _optionsMonitor;
 
-    public YuNetFaceMatchingService(IOnnxSessionManager sessionManager, FaceMatchingOptions? options = null)
+    public YuNetFaceMatchingService(IOnnxSessionManager sessionManager, IOptionsMonitor<FaceMatchingOptions> optionsMonitor)
     {
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-        _defaultThreshold = options?.MatchThreshold ?? 0.6;
+        _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
     }
 
     public FaceDetectionResult DetectFace(byte[] imageBytes)
@@ -114,19 +115,26 @@ public class YuNetFaceMatchingService : IFaceMatchingService
 
     public double CalculateDistance(float[] vectorA, float[] vectorB)
     {
-        // Simple euclidean for now (to satisfy interface)
-        double sum = 0.0;
+        if (vectorA.Length != vectorB.Length)
+        {
+            throw new ArgumentException("Vectors must have the same length.");
+        }
+
+        double dotProduct = 0.0;
         for (int i = 0; i < vectorA.Length; i++)
         {
-            sum += Math.Pow(vectorA[i] - vectorB[i], 2);
+            dotProduct += vectorA[i] * vectorB[i];
         }
-        return Math.Sqrt(sum);
+        
+        // We use 1.0 - dotProduct so that smaller distance = closer match.
+        // A perfect match has a dot product of 1.0, hence distance = 0.0.
+        return 1.0 - dotProduct;
     }
 
     public FaceMatchResult Match(float[] vectorA, float[] vectorB, double? threshold = null)
     {
         double distance = CalculateDistance(vectorA, vectorB);
-        return new FaceMatchResult(distance <= (threshold ?? _defaultThreshold), distance);
+        return new FaceMatchResult(distance <= (threshold ?? _optionsMonitor.CurrentValue.MatchThreshold), distance);
     }
 
     public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null)
@@ -134,7 +142,7 @@ public class YuNetFaceMatchingService : IFaceMatchingService
         ArgumentNullException.ThrowIfNull(targetVector);
         ArgumentNullException.ThrowIfNull(candidates);
 
-        double effectiveThreshold = threshold ?? _defaultThreshold;
+        double effectiveThreshold = threshold ?? _optionsMonitor.CurrentValue.MatchThreshold;
         double minDistance = double.MaxValue;
         Guid? matchedEmployeeId = null;
 
