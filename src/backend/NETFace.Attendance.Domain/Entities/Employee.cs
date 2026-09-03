@@ -14,7 +14,7 @@ public class Employee
     public string FullName { get; private set; }
     public EmployeeStatus Status { get; private set; }
     public bool IsAdmin { get; private set; }
-    public IReadOnlyList<FaceEmbedding> FaceEmbeddings => _faceEmbeddings.AsReadOnly();
+    public IReadOnlyCollection<FaceEmbedding> FaceEmbeddings => _faceEmbeddings;
 
     // EF Core constructor
     private Employee() { Id = Guid.NewGuid(); EmployeeCode = string.Empty; FullName = string.Empty; }

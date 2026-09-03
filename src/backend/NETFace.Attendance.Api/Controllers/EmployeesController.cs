@@ -22,9 +22,7 @@ public class EmployeesController(AppDbContext db) : ControllerBase
             await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
-            when (ex.InnerException?.Message.Contains("unique", StringComparison.OrdinalIgnoreCase) == true
-               || ex.InnerException?.Message.Contains("IX_", StringComparison.OrdinalIgnoreCase) == true
-               || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true)
+            when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
         {
             return Conflict(new { message = $"Employee code '{request.EmployeeCode}' already exists." });
         }

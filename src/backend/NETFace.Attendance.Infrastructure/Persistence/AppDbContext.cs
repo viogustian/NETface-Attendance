@@ -6,6 +6,7 @@ namespace NETFace.Attendance.Infrastructure.Persistence;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             {
                 emb.HasKey(fe => fe.Id);
                 emb.Property(fe => fe.Vector).IsRequired();
+            });
+        });
+
+        modelBuilder.Entity<AttendanceSession>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+
+            entity.Property(s => s.DepartmentName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.OwnsMany(s => s.Entries, entry =>
+            {
+                entry.HasKey(e => e.Id);
+
+                entry.Property(e => e.EmployeeCode)
+                     .IsRequired()
+                     .HasMaxLength(50);
+
+                entry.Property(e => e.EmployeeName)
+                     .IsRequired()
+                     .HasMaxLength(200);
             });
         });
     }
