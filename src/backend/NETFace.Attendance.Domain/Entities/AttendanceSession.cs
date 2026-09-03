@@ -63,4 +63,24 @@ public class AttendanceSession
 
         Status = AttendanceSessionStatus.Cancelled;
     }
+
+    public bool MarkAttendance(Guid employeeId, DateTimeOffset markedAt)
+    {
+        if (Status == AttendanceSessionStatus.Finalized)
+            throw new AttendanceSessionAlreadyFinalizedException();
+
+        if (Status != AttendanceSessionStatus.Active)
+            throw new InvalidOperationException($"Cannot mark attendance on a session with status '{Status}'.");
+
+        var entry = _entries.FirstOrDefault(e => e.EmployeeId == employeeId);
+        if (entry is null)
+            return false;
+
+        if (entry.Status == AttendanceStatus.Present)
+            return false;
+
+        entry.MarkPresent(markedAt);
+        return true;
+    }
 }
+

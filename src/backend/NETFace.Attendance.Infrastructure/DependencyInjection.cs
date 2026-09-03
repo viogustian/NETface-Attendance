@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IFaceDetectionService, DummyFaceDetectionService>();
         services.AddScoped<IFaceEmbeddingExtractor, DummyFaceEmbeddingExtractor>();
         services.AddScoped<IFaceMatchingService, DummyFaceMatchingService>();
+        services.AddScoped<IRecognitionAttendanceService, RecognitionAttendanceService>();
 
         return services;
     }

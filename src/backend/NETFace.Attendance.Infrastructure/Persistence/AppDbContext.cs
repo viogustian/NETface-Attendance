@@ -7,6 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
+    public DbSet<RecognitionLog> RecognitionLogs => Set<RecognitionLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,7 +54,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 entry.Property(e => e.EmployeeName)
                      .IsRequired()
                      .HasMaxLength(200);
+
+                entry.Property(e => e.MarkedAt);
             });
+        });
+
+        modelBuilder.Entity<RecognitionLog>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+
+            entity.Property(r => r.MatchedEmployeeCode)
+                  .HasMaxLength(50);
+
+            entity.Property(r => r.ErrorMessage)
+                  .HasMaxLength(500);
+
+            entity.Property(r => r.AttemptedAt)
+                  .IsRequired();
         });
     }
 }
+

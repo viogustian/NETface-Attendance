@@ -46,4 +46,27 @@ public class EmployeeTests
 
         Assert.Equal("An employee cannot have more than 5 face embeddings.", exception.Message);
     }
+
+    [Fact]
+    public void Deactivate_ShouldSetStatusToInactive()
+    {
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
+        Assert.Equal(EmployeeStatus.Active, employee.Status);
+
+        employee.Deactivate();
+
+        Assert.Equal(EmployeeStatus.Inactive, employee.Status);
+    }
+
+    [Fact]
+    public void Activate_ShouldSetStatusToActive()
+    {
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
+        employee.Deactivate();
+
+        employee.Activate();
+
+        Assert.Equal(EmployeeStatus.Active, employee.Status);
+    }
 }
+

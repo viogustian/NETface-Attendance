@@ -40,4 +40,15 @@ public class Employee
 
         _faceEmbeddings.Add(new FaceEmbedding(vector));
     }
+
+    public void Deactivate()
+    {
+        Status = EmployeeStatus.Inactive;
+    }
+
+    public void Activate()
+    {
+        Status = EmployeeStatus.Active;
+    }
 }
+

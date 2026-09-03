@@ -12,6 +12,7 @@ public class AttendanceEntry
     public string EmployeeName { get; private set; }
 
     public AttendanceStatus Status { get; private set; }
+    public DateTimeOffset? MarkedAt { get; private set; }
 
     // EF Core constructor
     private AttendanceEntry()
@@ -29,4 +30,11 @@ public class AttendanceEntry
         EmployeeName = employeeName;
         Status = AttendanceStatus.Absent;
     }
+
+    internal void MarkPresent(DateTimeOffset markedAt)
+    {
+        Status = AttendanceStatus.Present;
+        MarkedAt = markedAt;
+    }
 }
+
