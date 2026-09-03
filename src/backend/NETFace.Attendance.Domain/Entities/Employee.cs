@@ -36,8 +36,8 @@ public class Employee
     public void AddFaceEmbedding(float[] vector)
     {
         if (_faceEmbeddings.Count >= MaxEmbeddings)
-            throw new MaxFaceEmbeddingsReachedException("An employee can have a maximum of 5 face embeddings.");
+            throw new MaxFaceEmbeddingsReachedException();
 
-        _faceEmbeddings.Add(new FaceEmbedding(this.Id, vector));
+        _faceEmbeddings.Add(new FaceEmbedding(vector));
     }
 }

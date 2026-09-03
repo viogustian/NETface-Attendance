@@ -44,6 +44,6 @@ public class EmployeeTests
         var exception = Assert.Throws<MaxFaceEmbeddingsReachedException>(
             () => employee.AddFaceEmbedding(new float[] { 9.9f }));
 
-        Assert.Equal("An employee can have a maximum of 5 face embeddings.", exception.Message);
+        Assert.Equal("An employee cannot have more than 5 face embeddings.", exception.Message);
     }
 }

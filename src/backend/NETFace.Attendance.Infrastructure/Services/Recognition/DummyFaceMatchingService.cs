@@ -48,7 +48,7 @@ public class DummyFaceMatchingService : IFaceMatchingService
         return new FaceMatchResult(isMatch, distance);
     }
 
-    public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<FaceEmbedding> candidates, double? threshold = null)
+    public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null)
     {
         ArgumentNullException.ThrowIfNull(targetVector);
         ArgumentNullException.ThrowIfNull(candidates);
@@ -57,18 +57,21 @@ public class DummyFaceMatchingService : IFaceMatchingService
         double minDistance = double.MaxValue;
         Guid? matchedEmployeeId = null;
 
-        foreach (var candidate in candidates)
+        foreach (var employee in candidates)
         {
-            if (candidate?.Vector == null)
+            foreach (var candidate in employee.FaceEmbeddings)
             {
-                continue;
-            }
+                if (candidate?.Vector == null)
+                {
+                    continue;
+                }
 
-            double distance = CalculateDistance(targetVector, candidate.Vector);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                matchedEmployeeId = candidate.EmployeeId;
+                double distance = CalculateDistance(targetVector, candidate.Vector);
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    matchedEmployeeId = employee.Id;
+                }
             }
         }
 

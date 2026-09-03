@@ -112,7 +112,7 @@ public class DummyFaceMatchingServiceTests
         var employee2 = new NETFace.Attendance.Domain.Entities.Employee("EMP-002", "Bob", false);
         employee2.AddFaceEmbedding([0.9f, 0.9f]);
 
-        var candidates = new[] { employee1.FaceEmbeddings.First(), employee2.FaceEmbeddings.First() };
+        var candidates = new[] { employee1, employee2 };
         float[] queryVector = [0.12f, 0.11f]; // Closest to employee1
 
         // Act
@@ -131,7 +131,7 @@ public class DummyFaceMatchingServiceTests
         var employee1 = new NETFace.Attendance.Domain.Entities.Employee("EMP-001", "Alice", false);
         employee1.AddFaceEmbedding([0.8f, 0.8f]);
 
-        var candidates = new[] { employee1.FaceEmbeddings.First() };
+        var candidates = new[] { employee1 };
         float[] queryVector = [0.0f, 0.0f]; // Distance ~ 1.13 > 0.6
 
         // Act
@@ -147,7 +147,7 @@ public class DummyFaceMatchingServiceTests
     {
         // Arrange
         float[] queryVector = [0.1f, 0.2f];
-        var emptyCandidates = Array.Empty<NETFace.Attendance.Domain.Entities.FaceEmbedding>();
+        var emptyCandidates = Array.Empty<NETFace.Attendance.Domain.Entities.Employee>();
 
         // Act
         var result = _sut.FindBestMatch(queryVector, emptyCandidates);
@@ -182,7 +182,7 @@ public class DummyFaceMatchingServiceTests
     [Fact]
     public void FindBestMatch_WithNullArguments_ThrowsArgumentNullException()
     {
-        var candidates = Array.Empty<NETFace.Attendance.Domain.Entities.FaceEmbedding>();
+        var candidates = Array.Empty<NETFace.Attendance.Domain.Entities.Employee>();
 
         Assert.Throws<ArgumentNullException>(() => _sut.FindBestMatch(null!, candidates));
         Assert.Throws<ArgumentNullException>(() => _sut.FindBestMatch([0.1f], null!));
