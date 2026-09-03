@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NETFace.Attendance.Api.Controllers.AttendanceSessions;
@@ -8,6 +9,7 @@ using NETFace.Attendance.Infrastructure.Persistence;
 namespace NETFace.Attendance.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/attendance-sessions")]
 public class AttendanceSessionsController(AppDbContext db) : ControllerBase
 {

@@ -46,7 +46,9 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
             });
         });
 
-        return (customFactory.CreateClient(), customFactory.Services);
+        var client = customFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "netface-terminal-default-api-key");
+        return (client, customFactory.Services);
     }
 
     [Fact]

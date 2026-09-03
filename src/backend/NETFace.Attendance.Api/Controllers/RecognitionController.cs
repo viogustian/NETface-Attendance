@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NETFace.Attendance.Application.Interfaces;
 
@@ -13,6 +14,7 @@ namespace NETFace.Attendance.Api.Controllers;
 public class RecognitionController(IRecognitionAttendanceService recognitionService) : ControllerBase
 {
     [HttpPost("attempt")]
+    [Authorize(Roles = "Device")]
     public async Task<IActionResult> Attempt([FromQuery] Guid? sessionId, CancellationToken cancellationToken)
     {
         byte[]? imageBytes = null;

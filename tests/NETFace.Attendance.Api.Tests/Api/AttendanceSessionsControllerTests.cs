@@ -1,8 +1,13 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using NETFace.Attendance.Infrastructure.Persistence;
 
 namespace NETFace.Attendance.Api.Tests.Api;
@@ -16,10 +21,24 @@ public class AttendanceSessionsControllerTests : IClassFixture<WebApplicationFac
         _factory = factory;
     }
 
+    private static string GenerateAdminToken()
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("NETFace-Super-Secret-Key-Must-Be-At-Least-32-Bytes-Long-123456"));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()), new Claim(ClaimTypes.Role, "Admin") };
+        var token = new JwtSecurityToken(
+            issuer: "NETFace.Attendance.Api",
+            audience: "NETFace.Attendance.Clients",
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: creds);
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     private HttpClient CreateClientWithIsolatedDb()
     {
         var dbName = Guid.NewGuid().ToString();
-        return _factory.WithWebHostBuilder(builder =>
+        var client = _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
@@ -32,6 +51,9 @@ public class AttendanceSessionsControllerTests : IClassFixture<WebApplicationFac
                     options.UseInMemoryDatabase(dbName));
             });
         }).CreateClient();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GenerateAdminToken());
+        return client;
     }
 
     private static object BuildCreateRequest(int employeeCount = 2) => new
