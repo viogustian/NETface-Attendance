@@ -22,6 +22,17 @@ public static class DependencyInjection
         services.AddScoped<IFaceMatchingService, DummyFaceMatchingService>();
         services.AddScoped<IRecognitionAttendanceService, RecognitionAttendanceService>();
 
+        if (configuration != null)
+        {
+            services.Configure<OnnxModelOptions>(opts => 
+            {
+                var section = configuration.GetSection(OnnxModelOptions.SectionName);
+                opts.YuNetModelPath = section["YuNetModelPath"] ?? string.Empty;
+                opts.SFaceModelPath = section["SFaceModelPath"] ?? string.Empty;
+            });
+            services.AddSingleton<IOnnxSessionManager, OnnxSessionManager>();
+        }
+
         return services;
     }
 }
