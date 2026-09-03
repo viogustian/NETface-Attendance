@@ -66,4 +66,12 @@ public class DummyFaceDetectionAndExtractionTests
 
         await Assert.ThrowsAsync<ArgumentException>(() => extractor.ExtractEmbeddingAsync([]));
     }
+
+    [Fact]
+    public async Task DummyFaceEmbeddingExtractor_WithNullBytes_ThrowsArgumentNullException()
+    {
+        IFaceEmbeddingExtractor extractor = new DummyFaceEmbeddingExtractor();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => extractor.ExtractEmbeddingAsync(null!));
+    }
 }
