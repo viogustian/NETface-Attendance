@@ -23,7 +23,7 @@ public class SFaceEmbeddingExtractor : IFaceEmbeddingExtractor
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
     }
 
-    public Task<float[]> ExtractEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+    public async Task<float[]> ExtractEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
     {
         if (_sessionManager.SFaceSession == null)
         {
@@ -37,15 +37,27 @@ public class SFaceEmbeddingExtractor : IFaceEmbeddingExtractor
             NamedOnnxValue.CreateFromTensor("input", tensor)
         };
 
-        using var results = _sessionManager.SFaceSession.Run(inputs);
-        var outputTensor = results.First().AsTensor<float>();
-        
-        float[] embedding = outputTensor.ToArray();
+        if (_sessionManager.InferenceThrottle != null)
+        {
+            await _sessionManager.InferenceThrottle.WaitAsync(cancellationToken);
+        }
 
-        // Perform L2 Normalization explicitly on C# layer
-        L2Normalize(embedding);
+        try
+        {
+            using var results = _sessionManager.SFaceSession.Run(inputs);
+            var outputTensor = results.First().AsTensor<float>();
+            
+            float[] embedding = outputTensor.ToArray();
 
-        return Task.FromResult(embedding);
+            // Perform L2 Normalization explicitly on C# layer
+            L2Normalize(embedding);
+
+            return embedding;
+        }
+        finally
+        {
+            _sessionManager.InferenceThrottle?.Release();
+        }
     }
 
     public DenseTensor<float> PreprocessImage(byte[] imageBytes)
@@ -65,6 +77,8 @@ public class SFaceEmbeddingExtractor : IFaceEmbeddingExtractor
 
         // Create Tensor for SFace: [1, 3, 112, 112]
         // SFace normalization: (pixel - 127.5) / 127.5
+        // RGB SFace Color space constraint: No channel swap required from RGB
+        // As per ADR 0003, SFace expects RGB format tensor natively.
         var tensor = new DenseTensor<float>(new[] { 1, 3, TargetHeight, TargetWidth });
 
         image.ProcessPixelRows(accessor =>
@@ -84,7 +98,6 @@ public class SFaceEmbeddingExtractor : IFaceEmbeddingExtractor
 
         return tensor;
     }
-
 
     public void L2Normalize(float[] vector)
     {

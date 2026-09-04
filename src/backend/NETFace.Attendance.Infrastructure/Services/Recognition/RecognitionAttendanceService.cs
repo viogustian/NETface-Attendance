@@ -1,9 +1,12 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.ML.OnnxRuntime;
 using NETFace.Attendance.Application.DTOs;
 using NETFace.Attendance.Application.Interfaces;
 using NETFace.Attendance.Domain.Entities;
@@ -16,8 +19,13 @@ public class RecognitionAttendanceService(
     AppDbContext db,
     IFaceDetectionService faceDetectionService,
     IFaceEmbeddingExtractor faceEmbeddingExtractor,
-    IFaceMatchingService faceMatchingService) : IRecognitionAttendanceService
+    IFaceMatchingService faceMatchingService,
+    ISpoofingDetectionService? spoofingDetectionService = null,
+    ILogger<RecognitionAttendanceService>? logger = null) : IRecognitionAttendanceService
 {
+    private readonly ISpoofingDetectionService _spoofingDetectionService = spoofingDetectionService ?? new SpoofingDetectionService();
+    private readonly ILogger<RecognitionAttendanceService>? _logger = logger;
+
     public async Task<RecognitionAttemptResult> AttemptRecognitionAsync(
         byte[] imageBytes,
         Guid? sessionId = null,
@@ -31,16 +39,41 @@ public class RecognitionAttendanceService(
             return await FailAsync("Image data is required and cannot be empty.", stopwatch.ElapsedMilliseconds, cancellationToken);
         }
 
-        // 1. Detect face
-        var detectionResult = await faceDetectionService.DetectFacesAsync(imageBytes, cancellationToken);
-        if (!detectionResult.FaceDetected)
+        FaceDetectionResult detectionResult;
+        float[] embedding;
+
+        try
+        {
+            // 1. Detect face
+            detectionResult = await faceDetectionService.DetectFacesAsync(imageBytes, cancellationToken);
+            if (!detectionResult.FaceDetected)
+            {
+                stopwatch.Stop();
+                return await FailAsync("No face detected in image.", stopwatch.ElapsedMilliseconds, cancellationToken);
+            }
+
+            // 2. Extract embedding
+            embedding = await faceEmbeddingExtractor.ExtractEmbeddingAsync(imageBytes, cancellationToken);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or OutOfMemoryException or OnnxRuntimeException or InvalidOperationException)
         {
             stopwatch.Stop();
-            return await FailAsync("No face detected in image.", stopwatch.ElapsedMilliseconds, cancellationToken);
-        }
+            _logger?.LogError(ex, "Face recognition model failure or memory exhaustion. Falling back to PIN mode.");
 
-        // 2. Extract embedding
-        var embedding = await faceEmbeddingExtractor.ExtractEmbeddingAsync(imageBytes, cancellationToken);
+            var fallbackLog = RecognitionLog.CreateFailed(
+                $"Fallback to PIN mode due to recognition failure: {ex.Message}",
+                stopwatch.ElapsedMilliseconds,
+                DateTimeOffset.UtcNow);
+
+            db.RecognitionLogs.Add(fallbackLog);
+            await db.SaveChangesAsync(cancellationToken);
+
+            return new RecognitionAttemptResult(
+                Success: false,
+                Message: "Face recognition unavailable. Silakan gunakan PIN mode untuk absensi.",
+                FallbackToPin: true,
+                RecognitionLogId: fallbackLog.Id);
+        }
 
         // 3. Resolve active session
         AttendanceSession? session;
@@ -79,9 +112,33 @@ public class RecognitionAttendanceService(
             .ToListAsync(cancellationToken);
 
         var matchResult = faceMatchingService.FindBestMatch(embedding, employees);
+        string trackingKey = sessionId?.ToString() ?? "default-terminal";
+
         if (!matchResult.IsMatch || !matchResult.MatchedEmployeeId.HasValue)
         {
+            int failureCount = _spoofingDetectionService.RecordUnknownFace(trackingKey);
             stopwatch.Stop();
+
+            if (failureCount >= 3)
+            {
+                string auditMessage = $"Audit Alert: Consecutive unknown face attempts detected ({failureCount}) — possible spoofing.";
+                _logger?.LogWarning("AUDIT ALERT [SPOOFING]: Consecutive unknown face attempts ({Count}) detected for key {Key}. Access denied with 401.", failureCount, trackingKey);
+
+                var spoofingLog = RecognitionLog.CreateFailed(
+                    auditMessage,
+                    stopwatch.ElapsedMilliseconds,
+                    DateTimeOffset.UtcNow);
+
+                db.RecognitionLogs.Add(spoofingLog);
+                await db.SaveChangesAsync(cancellationToken);
+
+                return new RecognitionAttemptResult(
+                    Success: false,
+                    Message: "Access Denied — Consecutive unknown faces detected (possible spoofing).",
+                    RecognitionLogId: spoofingLog.Id,
+                    IsConsecutiveFailure: true);
+            }
+
             return await FailAsync("No matching employee found.", stopwatch.ElapsedMilliseconds, cancellationToken);
         }
 
@@ -94,19 +151,23 @@ public class RecognitionAttendanceService(
 
         double confidence = Math.Round(Math.Max(0.0, 1.0 - matchResult.Distance), 4);
 
-        // 5. Inactive employee rejection
+        // 5. Inactive employee rejection with high-priority alert
         if (matchedEmployee.Status == EmployeeStatus.Inactive)
         {
             stopwatch.Stop();
+            _logger?.LogWarning(
+                "HIGH-PRIORITY SECURITY ALERT: Access Denied — Inactive Employee {EmployeeCode} ({EmployeeId}, {FullName}) attempted recognition with confidence {Confidence}.",
+                matchedEmployee.EmployeeCode, matchedEmployee.Id, matchedEmployee.FullName, confidence);
+
             return await FailAsync(
-                "Employee is inactive and cannot mark attendance.",
+                "Access Denied — Inactive Employee",
                 stopwatch.ElapsedMilliseconds,
                 cancellationToken,
                 employeeId: matchedEmployee.Id,
                 employeeCode: matchedEmployee.EmployeeCode,
                 employeeName: matchedEmployee.FullName,
                 confidence: confidence,
-                logErrorMessage: "Matched employee is inactive.");
+                logErrorMessage: "Access Denied — Inactive Employee");
         }
 
         // 6. Check session roster
@@ -123,6 +184,9 @@ public class RecognitionAttendanceService(
                 employeeName: matchedEmployee.FullName,
                 confidence: confidence);
         }
+
+        // Recognition succeeded -> reset consecutive unknown face counter
+        _spoofingDetectionService.RecordSuccess(trackingKey);
 
         // 7. Duplicate recognition check
         if (entry.Status == AttendanceStatus.Present)

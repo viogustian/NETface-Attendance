@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +15,6 @@ using NETFace.Attendance.Application.Interfaces;
 using NETFace.Attendance.Domain.Entities;
 using NETFace.Attendance.Domain.Enums;
 using NETFace.Attendance.Infrastructure.Persistence;
-using NETFace.Attendance.Infrastructure.Services.Recognition;
 using Xunit;
 
 namespace NETFace.Attendance.Api.Tests.Api;
@@ -46,13 +48,19 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
                 var matchingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceMatchingService));
                 if (matchingSvcDescriptor is not null)
                     services.Remove(matchingSvcDescriptor);
-                services.AddScoped<IFaceMatchingService, DummyFaceMatchingService>();
+                services.AddScoped<IFaceMatchingService, TestFaceMatchingService>();
                 
                 // Mock IFaceEmbeddingExtractor as well to avoid real SFace extraction
                 var embeddingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceEmbeddingExtractor));
                 if (embeddingSvcDescriptor is not null)
                     services.Remove(embeddingSvcDescriptor);
-                services.AddScoped<IFaceEmbeddingExtractor, DummyFaceEmbeddingExtractor>();
+                services.AddScoped<IFaceEmbeddingExtractor, TestFaceEmbeddingExtractor>();
+
+                // Mock IFaceDetectionService to avoid real YuNet detection
+                var detectionSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceDetectionService));
+                if (detectionSvcDescriptor is not null)
+                    services.Remove(detectionSvcDescriptor);
+                services.AddScoped<IFaceDetectionService, TestFaceDetectionService>();
 
                 configureServices?.Invoke(services);
             });
@@ -69,7 +77,7 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         var (client, services) = CreateClientWithIsolatedDb();
         var imageBytes = new byte[] { 1, 2, 3, 4, 5 };
 
-        var extractor = new DummyFaceEmbeddingExtractor();
+        var extractor = new TestFaceEmbeddingExtractor();
         var embedding = await extractor.ExtractEmbeddingAsync(imageBytes);
 
         Guid employeeId;
@@ -132,7 +140,7 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         var (client, services) = CreateClientWithIsolatedDb();
         var imageBytes = new byte[] { 10, 20, 30, 40 };
 
-        var extractor = new DummyFaceEmbeddingExtractor();
+        var extractor = new TestFaceEmbeddingExtractor();
         var embedding = await extractor.ExtractEmbeddingAsync(imageBytes);
 
         Guid sessionId;
@@ -267,7 +275,7 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         var (client, services) = CreateClientWithIsolatedDb();
         var imageBytes = new byte[] { 50, 60, 70, 80 };
 
-        var extractor = new DummyFaceEmbeddingExtractor();
+        var extractor = new TestFaceEmbeddingExtractor();
         var embedding = await extractor.ExtractEmbeddingAsync(imageBytes);
 
         Guid sessionId;
@@ -301,7 +309,7 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
         Assert.NotNull(result);
         Assert.False(result.Success);
-        Assert.Equal("Employee is inactive and cannot mark attendance.", result.Message);
+        Assert.Equal("Access Denied — Inactive Employee", result.Message);
 
         // Verify DB: AttendanceEntry status is STILL Absent
         using (var scope = services.CreateScope())
@@ -317,8 +325,100 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
             Assert.False(log.IsSuccess);
             Assert.Equal(employeeId, log.EmployeeId);
             Assert.Equal("EMP009", log.MatchedEmployeeCode);
-            Assert.Equal("Matched employee is inactive.", log.ErrorMessage);
+            Assert.Equal("Access Denied — Inactive Employee", log.ErrorMessage);
         }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenConsecutiveUnknownFacesDetected_ReturnsUnauthorized401()
+    {
+        var (client, services) = CreateClientWithIsolatedDb(services =>
+        {
+            var matchingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceMatchingService));
+            if (matchingSvcDescriptor is not null)
+                services.Remove(matchingSvcDescriptor);
+
+            // Matching service that always returns no match (unknown face)
+            services.AddScoped<IFaceMatchingService, MockUnknownFaceMatchingService>();
+        });
+
+        Guid sessionId;
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), []);
+            db.AttendanceSessions.Add(session);
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        var dummyBytes = new byte[] { 1, 2, 3 };
+
+        // Attempt 1: returns 200 OK with success=false
+        using (var content1 = new ByteArrayContent(dummyBytes))
+        {
+            content1.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res1 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content1);
+            Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+        }
+
+        // Attempt 2: returns 200 OK with success=false
+        using (var content2 = new ByteArrayContent(dummyBytes))
+        {
+            content2.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res2 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content2);
+            Assert.Equal(HttpStatusCode.OK, res2.StatusCode);
+        }
+
+        // Attempt 3: threshold reached -> returns 401 Unauthorized
+        using (var content3 = new ByteArrayContent(dummyBytes))
+        {
+            content3.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res3 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content3);
+            Assert.Equal(HttpStatusCode.Unauthorized, res3.StatusCode);
+
+            var body3 = await res3.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+            Assert.NotNull(body3);
+            Assert.False(body3.Success);
+            Assert.Contains("Consecutive unknown faces", body3.Message);
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenModelFailsOrMissing_ReturnsGracefulFallbackToPinMode()
+    {
+        var (client, services) = CreateClientWithIsolatedDb(services =>
+        {
+            var extractorDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceEmbeddingExtractor));
+            if (extractorDescriptor is not null)
+                services.Remove(extractorDescriptor);
+
+            // Extractor throwing FileNotFoundException (missing model)
+            services.AddScoped<IFaceEmbeddingExtractor, MockFailingEmbeddingExtractor>();
+        });
+
+        Guid sessionId;
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), []);
+            db.AttendanceSessions.Add(session);
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        using var content = new ByteArrayContent(new byte[] { 1, 2, 3 });
+        content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var response = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.True(result.FallbackToPin);
+        Assert.Contains("PIN", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -327,7 +427,7 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         var (client, services) = CreateClientWithIsolatedDb();
         var validImageBytes = new byte[] { 101, 102, 103 };
 
-        var extractor = new DummyFaceEmbeddingExtractor();
+        var extractor = new TestFaceEmbeddingExtractor();
         var embedding = await extractor.ExtractEmbeddingAsync(validImageBytes);
 
         Guid sessionId;
@@ -403,6 +503,73 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         }
     }
 
+    private class MockUnknownFaceMatchingService : IFaceMatchingService
+    {
+        public double CalculateDistance(float[] vectorA, float[] vectorB) => 1.0;
+        public FaceMatchResult Match(float[] vectorA, float[] vectorB, double? threshold = null) => new(false, 1.0);
+        public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null) =>
+            new(false, 1.0, null);
+    }
+
+    private class MockFailingEmbeddingExtractor : IFaceEmbeddingExtractor
+    {
+        public Task<float[]> ExtractEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            throw new FileNotFoundException("Model file missing");
+        }
+    }
+
+    private class TestFaceEmbeddingExtractor : IFaceEmbeddingExtractor
+    {
+        public Task<float[]> ExtractEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            var vector = new float[128];
+            for (int i = 0; i < Math.Min(imageBytes.Length, 128); i++)
+            {
+                vector[i] = imageBytes[i] / 255.0f;
+            }
+            return Task.FromResult(vector);
+        }
+    }
+
+    private class TestFaceMatchingService : IFaceMatchingService
+    {
+        public double CalculateDistance(float[] vectorA, float[] vectorB)
+        {
+            double sum = 0;
+            for (int i = 0; i < Math.Min(vectorA.Length, vectorB.Length); i++)
+                sum += Math.Pow(vectorA[i] - vectorB[i], 2);
+            return Math.Sqrt(sum);
+        }
+
+        public FaceMatchResult Match(float[] vectorA, float[] vectorB, double? threshold = null)
+        {
+            var dist = CalculateDistance(vectorA, vectorB);
+            return new FaceMatchResult(dist <= (threshold ?? 0.5), dist);
+        }
+
+        public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null)
+        {
+            double minDistance = double.MaxValue;
+            Guid? bestEmployeeId = null;
+            foreach (var emp in candidates)
+            {
+                foreach (var emb in emp.FaceEmbeddings)
+                {
+                    if (emb?.Vector == null) continue;
+                    var dist = CalculateDistance(targetVector, emb.Vector);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        bestEmployeeId = emp.Id;
+                    }
+                }
+            }
+            bool isMatch = bestEmployeeId.HasValue && minDistance <= (threshold ?? 0.5);
+            return new FaceMatchResult(isMatch, minDistance, isMatch ? bestEmployeeId : null);
+        }
+    }
+
     private record RecognitionAttemptTestResponse(
         bool Success,
         string Message,
@@ -411,5 +578,13 @@ public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Pr
         string? EmployeeName,
         DateTimeOffset? MarkedAt,
         double Confidence,
-        Guid? RecognitionLogId);
+        Guid? RecognitionLogId,
+        bool FallbackToPin = false);
+    private class TestFaceDetectionService : IFaceDetectionService
+    {
+        public Task<FaceDetectionResult> DetectFacesAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new FaceDetectionResult(true, 1));
+        }
+    }
 }

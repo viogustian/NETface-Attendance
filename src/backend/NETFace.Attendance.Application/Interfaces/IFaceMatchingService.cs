@@ -9,5 +9,4 @@ public interface IFaceMatchingService
     double CalculateDistance(float[] vectorA, float[] vectorB);
     FaceMatchResult Match(float[] vectorA, float[] vectorB, double? threshold = null);
     FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null);
-    FaceDetectionResult DetectFace(byte[] imageBytes);
 }

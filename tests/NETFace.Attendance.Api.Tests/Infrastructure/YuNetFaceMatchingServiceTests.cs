@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using NETFace.Attendance.Application.Interfaces;
+using NETFace.Attendance.Domain.Entities;
 using NETFace.Attendance.Infrastructure.Services.Recognition;
 using SixLabors.ImageSharp;
 using Xunit;
@@ -12,6 +14,7 @@ public class YuNetFaceMatchingServiceTests
     {
         public Microsoft.ML.OnnxRuntime.InferenceSession YuNetSession => null!;
         public Microsoft.ML.OnnxRuntime.InferenceSession SFaceSession => null!;
+        public System.Threading.SemaphoreSlim InferenceThrottle { get; } = new(1);
         public void Dispose() {}
     }
 
@@ -87,13 +90,54 @@ public class YuNetFaceMatchingServiceTests
     }
 
     [Fact]
-    public void DetectFace_WithNullSession_ThrowsInvalidOperationException()
+    public void FindBestMatch_WithClosestCandidateWithinThreshold_ReturnsBestMatch()
+    {
+        // Arrange
+        var employee1 = new Employee("EMP-001", "Alice", false);
+        employee1.AddFaceEmbedding([1.0f, 0.0f]);
+
+        var employee2 = new Employee("EMP-002", "Bob", false);
+        employee2.AddFaceEmbedding([0.0f, 1.0f]);
+
+        var candidates = new[] { employee1, employee2 };
+        float[] queryVector = [0.9f, 0.1f];
+
+        // Act
+        var result = _sut.FindBestMatch(queryVector, candidates);
+
+        // Assert
+        Assert.True(result.IsMatch);
+        Assert.Equal(employee1.Id, result.MatchedEmployeeId);
+        Assert.True(result.Distance < 0.2);
+    }
+
+    [Fact]
+    public void FindBestMatch_WhenAllCandidatesExceedThreshold_ReturnsNoMatch()
+    {
+        // Arrange
+        var employee1 = new Employee("EMP-001", "Alice", false);
+        employee1.AddFaceEmbedding([0.0f, 1.0f]);
+
+        var candidates = new[] { employee1 };
+        float[] queryVector = [1.0f, 0.0f]; // Orthogonal, distance = 1.0 > 0.5
+
+        // Act
+        var result = _sut.FindBestMatch(queryVector, candidates);
+
+        // Assert
+        Assert.False(result.IsMatch);
+        Assert.Null(result.MatchedEmployeeId);
+    }
+
+    [Fact]
+    public async Task DetectFace_WithNullSession_ThrowsInvalidOperationException()
     {
         // Arrange
         byte[] dummyImage = CreateDummyJpeg();
+        var detectionService = new YuNetFaceDetectionService(new FakeOnnxSessionManager());
 
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => _sut.DetectFace(dummyImage));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => detectionService.DetectFacesAsync(dummyImage));
     }
 
     private byte[] CreateDummyJpeg()

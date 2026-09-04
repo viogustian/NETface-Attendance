@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.ML.OnnxRuntime;
 using NETFace.Attendance.Application.Interfaces;
 
 namespace NETFace.Attendance.Api.Controllers;
@@ -88,7 +89,13 @@ public class RecognitionController(IRecognitionAttendanceService recognitionServ
             EmployeeName: result.EmployeeName,
             MarkedAt: result.MarkedAt,
             Confidence: result.Confidence,
-            RecognitionLogId: result.RecognitionLogId);
+            RecognitionLogId: result.RecognitionLogId,
+            FallbackToPin: result.FallbackToPin);
+
+        if (result.IsConsecutiveFailure)
+        {
+            return Unauthorized(response);
+        }
 
         return Ok(response);
     }
@@ -104,4 +111,5 @@ public record RecognitionAttemptResponse(
     string? EmployeeName = null,
     DateTimeOffset? MarkedAt = null,
     double Confidence = 0.0,
-    Guid? RecognitionLogId = null);
+    Guid? RecognitionLogId = null,
+    bool FallbackToPin = false);

@@ -18,6 +18,7 @@ public class SFaceEmbeddingExtractorTests
     {
         public InferenceSession YuNetSession => null!;
         public InferenceSession SFaceSession { get; }
+        public System.Threading.SemaphoreSlim InferenceThrottle { get; } = new(1);
 
         public FakeOnnxSessionManager()
         {

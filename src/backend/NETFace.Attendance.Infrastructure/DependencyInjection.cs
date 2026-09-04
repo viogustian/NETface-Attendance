@@ -21,10 +21,11 @@ public static class DependencyInjection
             });
         }
 
-        services.AddScoped<IFaceDetectionService, DummyFaceDetectionService>();
+        services.AddScoped<IFaceDetectionService, YuNetFaceDetectionService>();
         services.AddScoped<IFaceEmbeddingExtractor, SFaceEmbeddingExtractor>();
         services.AddScoped<IFaceMatchingService, YuNetFaceMatchingService>();
         services.AddScoped<IRecognitionAttendanceService, RecognitionAttendanceService>();
+        services.AddSingleton<ISpoofingDetectionService, SpoofingDetectionService>();
 
         if (configuration != null)
         {

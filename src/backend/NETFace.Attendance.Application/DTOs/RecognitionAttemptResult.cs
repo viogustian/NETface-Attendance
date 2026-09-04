@@ -10,4 +10,6 @@ public record RecognitionAttemptResult(
     string? EmployeeName = null,
     DateTimeOffset? MarkedAt = null,
     double Confidence = 0.0,
-    Guid? RecognitionLogId = null);
+    Guid? RecognitionLogId = null,
+    bool FallbackToPin = false,
+    bool IsConsecutiveFailure = false);
