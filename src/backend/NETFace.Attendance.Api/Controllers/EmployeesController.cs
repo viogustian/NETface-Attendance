@@ -56,6 +56,22 @@ public class EmployeesController(AppDbContext db) : ControllerBase
         return Ok(employees);
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var employee = await db.Employees
+            .Include(e => e.FaceEmbeddings)
+            .FirstOrDefaultAsync(e => e.Id == id);
+
+        if (employee is null)
+            return NotFound(new { message = "Employee not found." });
+
+        db.Employees.Remove(employee);
+        await db.SaveChangesAsync();
+
+        return Ok(new { message = "Employee deleted successfully." });
+    }
+
     private static EmployeeResponse ToResponse(Employee e) =>
-        new(e.Id, e.EmployeeCode, e.FullName, e.IsAdmin, e.Status.ToString());
+        new(e.Id, e.EmployeeCode, e.FullName, e.IsAdmin, e.Status.ToString(), e.FaceEmbeddings?.Count ?? 0);
 }

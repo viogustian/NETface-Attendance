@@ -188,10 +188,22 @@ public class RecognitionAttendanceService(
         // Recognition succeeded -> reset consecutive unknown face counter
         _spoofingDetectionService.RecordSuccess(trackingKey);
 
-        // 7. Duplicate recognition check
-        if (entry.Status == AttendanceStatus.Present)
+        // 7. Get ClockOutStartTime setting from DB
+        var clockOutSetting = await db.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ClockOutStartTime", cancellationToken);
+        var clockOutStartTimeStr = clockOutSetting?.Value ?? "12:00:00"; // Default noon
+        if (!TimeSpan.TryParse(clockOutStartTimeStr, out var clockOutStartTime))
         {
-            stopwatch.Stop();
+            clockOutStartTime = new TimeSpan(12, 0, 0);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        bool attendanceMarked = session.MarkAttendance(matchedEmployee.Id, now, clockOutStartTime);
+
+        stopwatch.Stop();
+        
+        if (!attendanceMarked)
+        {
+            // Usually means duplicate scan within the same shift window, or they already clocked out.
             var log = RecognitionLog.CreateSuccess(
                 matchedEmployee.Id,
                 matchedEmployee.EmployeeCode,
@@ -202,22 +214,22 @@ public class RecognitionAttendanceService(
             db.RecognitionLogs.Add(log);
             await db.SaveChangesAsync(cancellationToken);
 
+            string duplicateMsg = entry.ClockOutTime.HasValue 
+                ? "Attendance complete (Clock Out already recorded)."
+                : "Attendance already marked (Clock In recorded).";
+
             return new RecognitionAttemptResult(
                 Success: true,
-                Message: "Attendance already marked.",
+                Message: duplicateMsg,
                 EmployeeId: matchedEmployee.Id,
                 EmployeeCode: matchedEmployee.EmployeeCode,
                 EmployeeName: entry.EmployeeName,
-                MarkedAt: entry.MarkedAt,
+                MarkedAt: entry.ClockOutTime ?? entry.ClockInTime ?? now,
                 Confidence: confidence,
                 RecognitionLogId: log.Id);
         }
 
-        // 8. First valid recognition: mark as Present
-        var now = DateTimeOffset.UtcNow;
-        session.MarkAttendance(matchedEmployee.Id, now);
-
-        stopwatch.Stop();
+        // 8. Successfully marked (either Clock In or Clock Out)
         var successLog = RecognitionLog.CreateSuccess(
             matchedEmployee.Id,
             matchedEmployee.EmployeeCode,
@@ -228,9 +240,13 @@ public class RecognitionAttendanceService(
         db.RecognitionLogs.Add(successLog);
         await db.SaveChangesAsync(cancellationToken);
 
+        string actionMsg = entry.ClockOutTime.HasValue 
+            ? $"Clock Out successful. Total Hours: {entry.TotalWorkHours:F2}"
+            : "Clock In successful.";
+
         return new RecognitionAttemptResult(
             Success: true,
-            Message: "Attendance marked successfully.",
+            Message: actionMsg,
             EmployeeId: matchedEmployee.Id,
             EmployeeCode: matchedEmployee.EmployeeCode,
             EmployeeName: entry.EmployeeName,

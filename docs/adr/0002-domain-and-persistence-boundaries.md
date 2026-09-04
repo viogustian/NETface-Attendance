@@ -19,7 +19,7 @@ We have adopted a strict Domain-Driven Design (DDD) approach with the following 
 4. **Duplicate Recognition**: The first valid recognition in a session counts. Subsequent recognitions are ignored for attendance marking but logged in the `RecognitionLog`.
 5. **Finalize Behavior**: Finalizing a session locks it, freezing the `Absent` status for all unmarked employees. Re-opening is forbidden through normal workflows.
 6. **Face Matching Strategy**: `IFaceMatchingService` will use in-memory vector matching for version 1. `pgvector` is not used yet, ensuring a clean abstraction layer for future upgrades.
-7. **API Boundary and Auth**: The API accepts raw images (HTTP POST) and performs all processing. Auth uses JWT for admins and Device Tokens/API Keys for terminals. Real-time streaming (WebSocket/gRPC) is excluded from version 1.
+7. **API Boundary and Auth**: The API accepts raw images (HTTP POST) and performs all processing. Auth uses JWT for both admins and terminals. Terminals will have their own dedicated login flow to acquire a JWT with a 'Device' role. Real-time streaming (WebSocket/gRPC) is excluded from version 1.
 
 ## Consequences
 * **Positive**: Audit history is completely immutable and protected. The domain model prevents inconsistent states (e.g., hanging attendance entries). Statistics calculations are simplified via roster pre-loading.

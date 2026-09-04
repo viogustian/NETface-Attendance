@@ -64,7 +64,7 @@ public class AttendanceSession
         Status = AttendanceSessionStatus.Cancelled;
     }
 
-    public bool MarkAttendance(Guid employeeId, DateTimeOffset markedAt)
+    public bool MarkAttendance(Guid employeeId, DateTimeOffset markedAt, TimeSpan clockOutStartTime)
     {
         if (Status == AttendanceSessionStatus.Finalized)
             throw new AttendanceSessionAlreadyFinalizedException();
@@ -76,10 +76,16 @@ public class AttendanceSession
         if (entry is null)
             return false;
 
-        if (entry.Status == AttendanceStatus.Present)
+        // If they already clocked out, they cannot mark attendance again
+        if (entry.ClockOutTime.HasValue)
+            return false;
+            
+        // If they already clocked in, and they try to clock in again before the shift ends, ignore it to prevent spam
+        var timeOfDay = markedAt.ToLocalTime().TimeOfDay;
+        if (entry.ClockInTime.HasValue && timeOfDay < clockOutStartTime)
             return false;
 
-        entry.MarkPresent(markedAt);
+        entry.MarkAttendance(markedAt, clockOutStartTime);
         return true;
     }
 }

@@ -41,6 +41,11 @@ public class Employee
         _faceEmbeddings.Add(new FaceEmbedding(vector));
     }
 
+    public void ClearFaceEmbeddings()
+    {
+        _faceEmbeddings.Clear();
+    }
+
     public void Deactivate()
     {
         Status = EmployeeStatus.Inactive;

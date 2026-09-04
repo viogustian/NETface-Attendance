@@ -4,7 +4,6 @@ public record EmployeeRosterItem(Guid EmployeeId, string EmployeeCode, string Em
 
 public record CreateAttendanceSessionRequest(
     string DepartmentName,
-    DateOnly Date,
     List<EmployeeRosterItem> Employees);
 
 public record AttendanceEntryResponse(
@@ -12,11 +11,14 @@ public record AttendanceEntryResponse(
     Guid EmployeeId,
     string EmployeeCode,
     string EmployeeName,
-    string Status);
+    string Status,
+    DateTimeOffset? ClockInTime = null,
+    DateTimeOffset? ClockOutTime = null,
+    double? TotalWorkHours = null);
 
 public record AttendanceSessionResponse(
     Guid Id,
     string DepartmentName,
     string Date,
     string Status,
-    int EntriesCount);
+    List<AttendanceEntryResponse> Entries);

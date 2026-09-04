@@ -1,0 +1,17 @@
+const ADMIN_TOKEN_KEY = 'adminToken';
+
+export const setToken = (token) => {
+  sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+};
+
+export const getToken = () => {
+  return sessionStorage.getItem(ADMIN_TOKEN_KEY);
+};
+
+export const clearToken = () => {
+  sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+};
+
+export const isAuthenticated = () => {
+  return Boolean(getToken());
+};
