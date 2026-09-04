@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import AlertError from '../../components/ui/AlertError';
+import { setToken } from '../../utils/auth';
 
 const loginSchema = z.object({
   employeeCode: z.string().min(1, 'Employee Code is required'),
@@ -29,14 +30,23 @@ export default function Login() {
       });
       
       if (!response.ok) {
-        throw new Error('Invalid credentials');
+        let errorMessage = 'Invalid credentials';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errorMessage = errData.message;
+          }
+        } catch {
+          // fallback if response is not json
+        }
+        throw new Error(errorMessage);
       }
       
       const result = await response.json();
-      sessionStorage.setItem('adminToken', result.token);
+      setToken(result.token);
       navigate('/admin');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An error occurred during login');
     }
   };
 

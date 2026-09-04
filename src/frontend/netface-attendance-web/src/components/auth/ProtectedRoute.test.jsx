@@ -43,4 +43,18 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByTestId('dashboard')).toBeInTheDocument();
   });
+
+  it('renders passed children prop directly when token is present', () => {
+    sessionStorage.setItem('adminToken', 'fake-jwt-token');
+
+    render(
+      <MemoryRouter>
+        <ProtectedRoute>
+          <div data-testid="direct-child">Direct Child Content</div>
+        </ProtectedRoute>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('direct-child')).toBeInTheDocument();
+  });
 });

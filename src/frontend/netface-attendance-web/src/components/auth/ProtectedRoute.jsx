@@ -1,9 +1,8 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import { isAuthenticated } from '../../utils/auth';
 
 const ProtectedRoute = ({ children }) => {
-  const token = sessionStorage.getItem('adminToken');
-
-  if (!token) {
+  if (!isAuthenticated()) {
     return <Navigate to="/admin/login" replace />;
   }
 

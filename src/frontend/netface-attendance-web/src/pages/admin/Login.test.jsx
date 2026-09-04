@@ -68,9 +68,11 @@ describe('Login', () => {
     });
   });
 
-  it('handles failed login', async () => {
+  it('handles failed login displaying error message from API', async () => {
     global.fetch.mockResolvedValueOnce({
       ok: false,
+      status: 401,
+      json: async () => ({ message: 'Invalid credentials or unauthorized.' }),
     });
 
     render(
@@ -84,7 +86,47 @@ describe('Login', () => {
     
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(await screen.findByText('Invalid credentials')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid credentials or unauthorized.')).toBeInTheDocument();
+    expect(sessionStorage.getItem('adminToken')).toBeNull();
+  });
+
+  it('handles failed login when API returns specific error message', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'Employee code is required.' }),
+    });
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/employee code/i), { target: { value: 'EMP001' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
+    
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByText('Employee code is required.')).toBeInTheDocument();
+    expect(sessionStorage.getItem('adminToken')).toBeNull();
+  });
+
+  it('handles network or unexpected error gracefully', async () => {
+    global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/employee code/i), { target: { value: 'EMP001' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+    
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByText('Network error')).toBeInTheDocument();
     expect(sessionStorage.getItem('adminToken')).toBeNull();
   });
 });
