@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Plus } from 'lucide-react';
 import AlertError from '../../components/ui/AlertError';
+import Skeleton from '../../components/ui/Skeleton';
+import { getToken } from '../../utils/auth';
 
 export default function EmployeeList() {
   const [employees, setEmployees] = useState([]);
@@ -11,7 +13,7 @@ export default function EmployeeList() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const token = sessionStorage.getItem('adminToken');
+        const token = getToken();
         const res = await fetch('/api/employees', {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -48,11 +50,36 @@ export default function EmployeeList() {
 
       <div className="glass-panel" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            Loading employees...
-          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <th style={{ padding: '1rem' }}>Code</th>
+                <th style={{ padding: '1rem' }}>Full Name</th>
+                <th style={{ padding: '1rem' }}>Status</th>
+                <th style={{ padding: '1rem' }}>Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(5)].map((_, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                  <td style={{ padding: '1rem' }}>
+                    <Skeleton width="80px" height="1.2rem" />
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <Skeleton width="180px" height="1.2rem" />
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <Skeleton width="60px" height="1.2rem" borderRadius="12px" />
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <Skeleton width="70px" height="1.2rem" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : employees.length === 0 ? (
-          <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+          <div style={{ padding: '4rem 2rem', textAlign: 'center' }} data-testid="empty-state">
             <Users size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5 }} />
             <h3>No employees found</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Get started by adding your first employee.</p>
