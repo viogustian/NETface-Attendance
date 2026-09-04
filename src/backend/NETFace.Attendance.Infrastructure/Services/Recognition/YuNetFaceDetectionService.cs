@@ -8,6 +8,7 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 using NETFace.Attendance.Application.Interfaces;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace NETFace.Attendance.Infrastructure.Services.Recognition;
 
@@ -22,7 +23,23 @@ public class YuNetFaceDetectionService : IFaceDetectionService
 
     public async Task<FaceDetectionResult> DetectFacesAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
     {
+        // Note: For unit testing purposes if InferenceSession is null (mocked incorrectly) we handle it gracefully
+        if (_sessionManager.YuNetSession == null)
+        {
+            throw new InvalidOperationException("YuNet Session is not initialized.");
+        }
+
         using var image = Image.Load<Rgb24>(imageBytes);
+
+        var inputMeta = _sessionManager.YuNetSession.InputMetadata.Values.First();
+        int expectedHeight = inputMeta.Dimensions[2] > 0 ? inputMeta.Dimensions[2] : image.Height;
+        int expectedWidth = inputMeta.Dimensions[3] > 0 ? inputMeta.Dimensions[3] : image.Width;
+
+        if (image.Width != expectedWidth || image.Height != expectedHeight)
+        {
+            image.Mutate(x => x.Resize(expectedWidth, expectedHeight));
+        }
+
         int width = image.Width;
         int height = image.Height;
 
@@ -50,11 +67,7 @@ public class YuNetFaceDetectionService : IFaceDetectionService
             NamedOnnxValue.CreateFromTensor("input", tensor)
         };
 
-        // Note: For unit testing purposes if InferenceSession is null (mocked incorrectly) we handle it gracefully
-        if (_sessionManager.YuNetSession == null)
-        {
-            throw new InvalidOperationException("YuNet Session is not initialized.");
-        }
+
 
         if (_sessionManager.InferenceThrottle != null)
         {
@@ -65,13 +78,87 @@ public class YuNetFaceDetectionService : IFaceDetectionService
         try
         {
             results = _sessionManager.YuNetSession.Run(inputs);
-            var outputTensor = results.First(v => v.Name == "dets").AsTensor<float>();
-        
-            int numDetections = outputTensor.Dimensions.Length > 0 ? outputTensor.Dimensions[0] : 0;
-            
-            if (numDetections > 1) 
+
+            var strides = new[] { 8, 16, 32 };
+            var candidates = new List<(float Score, float[] BBox, float[][] Landmarks)>();
+
+            foreach (var stride in strides)
             {
-                return new FaceDetectionResult(true, numDetections) 
+                var cls = results.First(v => v.Name == $"cls_{stride}").AsTensor<float>();
+                var obj = results.First(v => v.Name == $"obj_{stride}").AsTensor<float>();
+                var bbox = results.First(v => v.Name == $"bbox_{stride}").AsTensor<float>();
+                var kps = results.First(v => v.Name == $"kps_{stride}").AsTensor<float>();
+
+                int gridW = width / stride;
+                int gridH = height / stride;
+
+                for (int y = 0; y < gridH; y++)
+                {
+                    for (int x = 0; x < gridW; x++)
+                    {
+                        int idx = y * gridW + x;
+                        
+                        float clsScore = cls.GetValue(idx);
+                        float objScore = obj.GetValue(idx);
+                        
+                        // Sigmoid if needed, but assuming they are probabilities based on my test
+                        float conf = clsScore * objScore;
+                        
+                        if (conf > 0.6f)
+                        {
+                            float dx = bbox.GetValue(idx * 4 + 0);
+                            float dy = bbox.GetValue(idx * 4 + 1);
+                            float dw = bbox.GetValue(idx * 4 + 2);
+                            float dh = bbox.GetValue(idx * 4 + 3);
+
+                            float cx = (x * stride) + dx * stride;
+                            float cy = (y * stride) + dy * stride;
+                            float w = (float)(Math.Exp(dw) * stride);
+                            float h = (float)(Math.Exp(dh) * stride);
+
+                            float x1 = cx - w / 2;
+                            float y1 = cy - h / 2;
+
+                            var kpsArr = new float[5][];
+                            for (int k = 0; k < 5; k++)
+                            {
+                                float kx = kps.GetValue(idx * 10 + k * 2 + 0);
+                                float ky = kps.GetValue(idx * 10 + k * 2 + 1);
+                                kpsArr[k] = new float[] 
+                                {
+                                    (x * stride) + kx * stride, 
+                                    (y * stride) + ky * stride 
+                                };
+                            }
+
+                            candidates.Add((conf, new float[] { x1, y1, w, h }, kpsArr));
+                        }
+                    }
+                }
+            }
+
+            // NMS (Non-Maximum Suppression) to filter overlapping boxes
+            candidates = candidates.OrderByDescending(c => c.Score).ToList();
+            var finalFaces = new List<(float Score, float[] BBox, float[][] Landmarks)>();
+
+            foreach (var cand in candidates)
+            {
+                bool keep = true;
+                foreach (var face in finalFaces)
+                {
+                    float iou = ComputeIoU(cand.BBox, face.BBox);
+                    if (iou > 0.5f) // NMS threshold
+                    {
+                        keep = false;
+                        break;
+                    }
+                }
+                if (keep) finalFaces.Add(cand);
+            }
+
+            if (finalFaces.Count > 1)
+            {
+                return new FaceDetectionResult(true, finalFaces.Count) 
                 {
                     Success = false,
                     ErrorCode = "multi_face_detected",
@@ -79,42 +166,22 @@ public class YuNetFaceDetectionService : IFaceDetectionService
                 };
             }
             
-            if (numDetections == 0)
+            if (finalFaces.Count == 0)
             {
                 return new FaceDetectionResult(false, 0)
                 {
                     Success = false,
                     ErrorCode = "no_face_detected",
-                    ErrorMessage = "Tidak ada wajah"
+                    ErrorMessage = "Wajah tidak ditemukan. Pastikan wajah terlihat jelas."
                 };
             }
 
-            // Example indices for standard YuNet output
-            float confidence = outputTensor[0, 14];
-            if (confidence < 0.6f)
-            {
-                 return new FaceDetectionResult(true, 1)
-                {
-                    Success = false,
-                    ErrorCode = "no_face_detected",
-                    ErrorMessage = "Confidence level < 0.6"
-                };
-            }
-
-            var bbox = new float[] { outputTensor[0,0], outputTensor[0,1], outputTensor[0,2], outputTensor[0,3] };
-            var landmarks = new float[][] {
-                new float[] { outputTensor[0,4], outputTensor[0,5] }, // right eye
-                new float[] { outputTensor[0,6], outputTensor[0,7] }, // left eye
-                new float[] { outputTensor[0,8], outputTensor[0,9] }, // nose
-                new float[] { outputTensor[0,10], outputTensor[0,11] }, // right mouth
-                new float[] { outputTensor[0,12], outputTensor[0,13] }  // left mouth
-            };
-
+            var bestFace = finalFaces[0];
             return new FaceDetectionResult(true, 1)
             {
                 Success = true,
-                BoundingBox = bbox,
-                Landmarks = landmarks
+                BoundingBox = bestFace.BBox,
+                Landmarks = bestFace.Landmarks
             };
         }
         finally
@@ -122,5 +189,19 @@ public class YuNetFaceDetectionService : IFaceDetectionService
             results?.Dispose();
             _sessionManager.InferenceThrottle?.Release();
         }
+    }
+
+    private float ComputeIoU(float[] boxA, float[] boxB)
+    {
+        float xA = Math.Max(boxA[0], boxB[0]);
+        float yA = Math.Max(boxA[1], boxB[1]);
+        float xB = Math.Min(boxA[0] + boxA[2], boxB[0] + boxB[2]);
+        float yB = Math.Min(boxA[1] + boxA[3], boxB[1] + boxB[3]);
+
+        float interArea = Math.Max(0, xB - xA) * Math.Max(0, yB - yA);
+        float boxAArea = boxA[2] * boxA[3];
+        float boxBArea = boxB[2] * boxB[3];
+        
+        return interArea / (boxAArea + boxBArea - interArea + 1e-5f);
     }
 }

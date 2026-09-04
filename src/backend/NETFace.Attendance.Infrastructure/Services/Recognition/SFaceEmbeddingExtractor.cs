@@ -34,7 +34,7 @@ public class SFaceEmbeddingExtractor : IFaceEmbeddingExtractor
 
         var inputs = new List<NamedOnnxValue>
         {
-            NamedOnnxValue.CreateFromTensor("input", tensor)
+            NamedOnnxValue.CreateFromTensor("data", tensor)
         };
 
         if (_sessionManager.InferenceThrottle != null)

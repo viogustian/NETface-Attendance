@@ -8,7 +8,6 @@ import AlertError from '../../../components/ui/AlertError';
 
 const sessionSchema = z.object({
   departmentName: z.string().min(1, 'Department Name is required'),
-  date: z.string().min(1, 'Date is required'),
   employeeIds: z.array(z.string()).min(1, 'Select at least one employee for the roster'),
 });
 
@@ -21,8 +20,7 @@ export default function CreateSession() {
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(sessionSchema),
     defaultValues: {
-      employeeIds: [],
-      date: new Date().toISOString().split('T')[0]
+      employeeIds: []
     }
   });
 
@@ -64,7 +62,6 @@ export default function CreateSession() {
       
       const payload = {
         departmentName: data.departmentName,
-        date: data.date,
         employees: mappedEmployees
       };
 
@@ -99,7 +96,7 @@ export default function CreateSession() {
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <CalendarPlus color="var(--primary-color)" /> Create Attendance Session
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Start a new session for a specific department and date.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Start a new session for a specific department. Date will automatically follow server time.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem' }}>
@@ -116,17 +113,6 @@ export default function CreateSession() {
                 {...register('departmentName')} 
               />
               {errors.departmentName && <span className="error-text">{errors.departmentName.message}</span>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="date">Date</label>
-              <input 
-                id="date"
-                type="date"
-                className="input-field" 
-                {...register('date')} 
-              />
-              {errors.date && <span className="error-text">{errors.date.message}</span>}
             </div>
 
             <div style={{ marginTop: '2.5rem' }}>

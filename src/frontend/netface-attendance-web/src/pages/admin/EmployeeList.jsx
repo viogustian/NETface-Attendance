@@ -32,6 +32,25 @@ export default function EmployeeList() {
     fetchEmployees();
   }, []);
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this employee? This will permanently remove their data and face embeddings.')) return;
+    
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/employees/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) throw new Error('Failed to delete employee');
+      setEmployees(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   return (
     <div className="page-container animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -57,6 +76,7 @@ export default function EmployeeList() {
                 <th style={{ padding: '1rem' }}>Full Name</th>
                 <th style={{ padding: '1rem' }}>Status</th>
                 <th style={{ padding: '1rem' }}>Role</th>
+                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -73,6 +93,9 @@ export default function EmployeeList() {
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <Skeleton width="70px" height="1.2rem" />
+                  </td>
+                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <Skeleton width="100px" height="1.8rem" borderRadius="4px" style={{ marginLeft: 'auto' }} />
                   </td>
                 </tr>
               ))}
@@ -95,6 +118,7 @@ export default function EmployeeList() {
                 <th style={{ padding: '1rem' }}>Full Name</th>
                 <th style={{ padding: '1rem' }}>Status</th>
                 <th style={{ padding: '1rem' }}>Role</th>
+                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -116,6 +140,20 @@ export default function EmployeeList() {
                   </td>
                   <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
                     {emp.isAdmin ? 'Admin' : 'Employee'}
+                  </td>
+                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <Link to={`/admin/employees/${emp.id}/faces`} className="btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
+                        Face Enrollment ({emp.enrolledFacesCount}/5)
+                      </Link>
+                      <button 
+                        onClick={() => handleDelete(emp.id)} 
+                        className="btn-danger" 
+                        style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--danger-color)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

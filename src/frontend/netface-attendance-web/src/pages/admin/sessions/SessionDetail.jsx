@@ -9,6 +9,8 @@ export default function SessionDetail() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let intervalId;
+    
     const fetchSession = async () => {
       try {
         const token = sessionStorage.getItem('adminToken');
@@ -18,13 +20,25 @@ export default function SessionDetail() {
         if (!res.ok) throw new Error('Failed to load session details');
         const data = await res.json();
         setSession(data);
+        
+        // If session is active, setup polling every 3 seconds
+        if (data.status === 'Active' && !intervalId) {
+            intervalId = setInterval(fetchSession, 3000);
+        } else if (data.status !== 'Active' && intervalId) {
+            clearInterval(intervalId);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
+    
     fetchSession();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [id]);
 
 
@@ -66,6 +80,16 @@ export default function SessionDetail() {
             </span>
           </div>
         </div>
+        <div>
+          <button 
+            className="btn-primary" 
+            onClick={() => {
+              window.open(`/api/attendance-sessions/${id}/export`, '_blank');
+            }}
+          >
+            Download CSV
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -91,6 +115,9 @@ export default function SessionDetail() {
               <th style={{ padding: '1rem' }}>Employee Code</th>
               <th style={{ padding: '1rem' }}>Name</th>
               <th style={{ padding: '1rem' }}>Status</th>
+              <th style={{ padding: '1rem' }}>Clock In</th>
+              <th style={{ padding: '1rem' }}>Clock Out</th>
+              <th style={{ padding: '1rem' }}>Total Hours</th>
             </tr>
           </thead>
           <tbody>
@@ -106,11 +133,20 @@ export default function SessionDetail() {
                     {entry.status}
                   </div>
                 </td>
+                <td style={{ padding: '1rem' }}>
+                  {entry.clockInTime ? new Date(entry.clockInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                </td>
+                <td style={{ padding: '1rem' }}>
+                  {entry.clockOutTime ? new Date(entry.clockOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                </td>
+                <td style={{ padding: '1rem', fontWeight: 'bold' }}>
+                  {entry.totalWorkHours ? entry.totalWorkHours.toFixed(2) : '-'}
+                </td>
               </tr>
             ))}
             {(!session.entries || session.entries.length === 0) && (
               <tr>
-                <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                   No entries found in this session.
                 </td>
               </tr>

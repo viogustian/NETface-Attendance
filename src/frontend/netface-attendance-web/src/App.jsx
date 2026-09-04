@@ -5,9 +5,11 @@ import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import EmployeeList from './pages/admin/EmployeeList';
 import CreateEmployee from './pages/admin/CreateEmployee';
+import FaceEnrollment from './pages/admin/FaceEnrollment';
 import SessionList from './pages/admin/sessions/SessionList';
 import CreateSession from './pages/admin/sessions/CreateSession';
 import SessionDetail from './pages/admin/sessions/SessionDetail';
+import Settings from './pages/admin/Settings';
 import KioskLayout from './components/layouts/KioskLayout';
 import KioskHome from './pages/kiosk/KioskHome';
 
@@ -24,10 +26,13 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="employees" element={<EmployeeList />} />
             <Route path="employees/create" element={<CreateEmployee />} />
+            <Route path="employees/:id/faces" element={<FaceEnrollment />} />
             <Route path="sessions" element={<SessionList />} />
             <Route path="sessions/create" element={<CreateSession />} />
             <Route path="sessions/:id" element={<SessionDetail />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
+
         </Route>
 
         {/* Kiosk Routes */}
