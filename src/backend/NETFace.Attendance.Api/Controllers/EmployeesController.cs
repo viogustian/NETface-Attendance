@@ -1,91 +1,61 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using NETFace.Attendance.Api.DTOs;
+using NETFace.Attendance.Api.Controllers.Employees;
 using NETFace.Attendance.Domain.Entities;
 using NETFace.Attendance.Infrastructure.Persistence;
 
 namespace NETFace.Attendance.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class EmployeesController : ControllerBase
+[Authorize(Roles = "Admin")]
+[Route("api/employees")]
+public class EmployeesController(AppDbContext db) : ControllerBase
 {
-    private readonly AppDbContext _context;
-
-    public EmployeesController(AppDbContext context)
-    {
-        _context = context;
-    }
-
     [HttpPost]
-    public async Task<IActionResult> Create(CreateEmployeeRequest request)
+    public async Task<IActionResult> Create([FromBody] CreateEmployeeRequest request)
     {
-        var employee = new Employee(request.EmployeeCode, request.ProfileDetails, request.AdminFlag);
+        var employee = new Employee(request.EmployeeCode, request.FullName, request.IsAdmin);
 
-        _context.Employees.Add(employee);
+        db.Employees.Add(employee);
 
         try
         {
-            await _context.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
-            when (ex.InnerException?.Message.Contains("unique", StringComparison.OrdinalIgnoreCase) == true
-               || ex.InnerException?.Message.Contains("IX_", StringComparison.OrdinalIgnoreCase) == true
-               || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true)
+            when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
         {
-            return Conflict(new { error = "An employee with this employee code already exists." });
+            return Conflict(new { message = $"Employee code '{request.EmployeeCode}' already exists." });
         }
 
-        var response = new EmployeeResponse(
-            employee.Id,
-            employee.EmployeeCode,
-            employee.ProfileDetails,
-            employee.Status.ToString(),
-            employee.AdminFlag,
-            employee.FaceEmbeddings.Count
-        );
-
+        var response = ToResponse(employee);
         return CreatedAtAction(nameof(Get), new { id = employee.Id }, response);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}", Name = nameof(Get))]
     public async Task<IActionResult> Get(Guid id)
     {
-        var employee = await _context.Employees
+        var employee = await db.Employees
             .Include(e => e.FaceEmbeddings)
             .FirstOrDefaultAsync(e => e.Id == id);
 
-        if (employee == null) return NotFound();
+        if (employee is null)
+            return NotFound();
 
-        var response = new EmployeeResponse(
-            employee.Id,
-            employee.EmployeeCode,
-            employee.ProfileDetails,
-            employee.Status.ToString(),
-            employee.AdminFlag,
-            employee.FaceEmbeddings.Count
-        );
-
-        return Ok(response);
+        return Ok(ToResponse(employee));
     }
 
     [HttpGet]
     public async Task<IActionResult> List()
     {
-        var employees = await _context.Employees
-            .Select(e => new EmployeeResponse(
-                e.Id,
-                e.EmployeeCode,
-                e.ProfileDetails,
-                e.Status.ToString(),
-                e.AdminFlag,
-                e.FaceEmbeddings.Count
-            ))
+        var employees = await db.Employees
+            .Select(e => ToResponse(e))
             .ToListAsync();
 
         return Ok(employees);
     }
+
+    private static EmployeeResponse ToResponse(Employee e) =>
+        new(e.Id, e.EmployeeCode, e.FullName, e.IsAdmin, e.Status.ToString());
 }

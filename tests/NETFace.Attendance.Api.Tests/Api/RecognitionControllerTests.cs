@@ -1,0 +1,590 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using NETFace.Attendance.Application.Interfaces;
+using NETFace.Attendance.Domain.Entities;
+using NETFace.Attendance.Domain.Enums;
+using NETFace.Attendance.Infrastructure.Persistence;
+using Xunit;
+
+namespace NETFace.Attendance.Api.Tests.Api;
+
+public class RecognitionControllerTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly WebApplicationFactory<Program> _factory;
+
+    public RecognitionControllerTests(WebApplicationFactory<Program> factory)
+    {
+        _factory = factory;
+    }
+
+    private (HttpClient Client, IServiceProvider Services) CreateClientWithIsolatedDb(
+        Action<IServiceCollection>? configureServices = null)
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var customFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                var descriptor = services.SingleOrDefault(
+                    d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+                if (descriptor is not null)
+                    services.Remove(descriptor);
+
+                services.AddDbContext<AppDbContext>(options =>
+                    options.UseInMemoryDatabase(dbName));
+
+                // Mock IFaceMatchingService to avoid OnnxSessionManager throwing FileNotFoundException in test environment
+                var matchingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceMatchingService));
+                if (matchingSvcDescriptor is not null)
+                    services.Remove(matchingSvcDescriptor);
+                services.AddScoped<IFaceMatchingService, TestFaceMatchingService>();
+                
+                // Mock IFaceEmbeddingExtractor as well to avoid real SFace extraction
+                var embeddingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceEmbeddingExtractor));
+                if (embeddingSvcDescriptor is not null)
+                    services.Remove(embeddingSvcDescriptor);
+                services.AddScoped<IFaceEmbeddingExtractor, TestFaceEmbeddingExtractor>();
+
+                // Mock IFaceDetectionService to avoid real YuNet detection
+                var detectionSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceDetectionService));
+                if (detectionSvcDescriptor is not null)
+                    services.Remove(detectionSvcDescriptor);
+                services.AddScoped<IFaceDetectionService, TestFaceDetectionService>();
+
+                configureServices?.Invoke(services);
+            });
+        });
+
+        var client = customFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "netface-terminal-default-api-key");
+        return (client, customFactory.Services);
+    }
+
+    [Fact]
+    public async Task Attempt_FirstValidRecognition_UpdatesAttendanceEntryToPresent_AndLogsSuccess()
+    {
+        var (client, services) = CreateClientWithIsolatedDb();
+        var imageBytes = new byte[] { 1, 2, 3, 4, 5 };
+
+        var extractor = new TestFaceEmbeddingExtractor();
+        var embedding = await extractor.ExtractEmbeddingAsync(imageBytes);
+
+        Guid employeeId;
+        Guid sessionId;
+
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var employee = new Employee("EMP001", "Alice Wonderland", isAdmin: false);
+            employee.AddFaceEmbedding(embedding);
+            db.Employees.Add(employee);
+
+            var roster = new List<(Guid, string, string)> { (employee.Id, employee.EmployeeCode, employee.FullName) };
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), roster);
+            db.AttendanceSessions.Add(session);
+
+            await db.SaveChangesAsync();
+
+            employeeId = employee.Id;
+            sessionId = session.Id;
+        }
+
+        // Post raw image with sessionId query param
+        using var content = new ByteArrayContent(imageBytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var response = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+        Assert.NotNull(result);
+        Assert.True(result.Success);
+        Assert.Equal("EMP001", result.EmployeeCode);
+        Assert.Equal("Alice Wonderland", result.EmployeeName);
+        Assert.NotNull(result.MarkedAt);
+
+        // Verify database persistence
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var updatedSession = await db.AttendanceSessions.Include(s => s.Entries).SingleAsync(s => s.Id == sessionId);
+            var entry = Assert.Single(updatedSession.Entries);
+            Assert.Equal(AttendanceStatus.Present, entry.Status);
+            Assert.Equal(result.MarkedAt, entry.MarkedAt);
+
+            var log = await db.RecognitionLogs.SingleAsync();
+            Assert.True(log.IsSuccess);
+            Assert.Equal(employeeId, log.EmployeeId);
+            Assert.Equal("EMP001", log.MatchedEmployeeCode);
+            Assert.Null(log.ErrorMessage);
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_DuplicateRecognition_DoesNotUpdateMarkedAt_AndCreatesAdditionalLog()
+    {
+        var (client, services) = CreateClientWithIsolatedDb();
+        var imageBytes = new byte[] { 10, 20, 30, 40 };
+
+        var extractor = new TestFaceEmbeddingExtractor();
+        var embedding = await extractor.ExtractEmbeddingAsync(imageBytes);
+
+        Guid sessionId;
+
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var employee = new Employee("EMP001", "Alice Wonderland", isAdmin: false);
+            employee.AddFaceEmbedding(embedding);
+            db.Employees.Add(employee);
+
+            var roster = new List<(Guid, string, string)> { (employee.Id, employee.EmployeeCode, employee.FullName) };
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), roster);
+            db.AttendanceSessions.Add(session);
+
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        // 1st call (First recognition)
+        using (var content1 = new ByteArrayContent(imageBytes))
+        {
+            content1.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var firstResponse = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content1);
+            Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        }
+
+        DateTimeOffset initialMarkedAt;
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = await db.AttendanceSessions.Include(s => s.Entries).SingleAsync(s => s.Id == sessionId);
+            initialMarkedAt = session.Entries.Single().MarkedAt!.Value;
+        }
+
+        // 2nd call (Duplicate recognition) via Multipart form
+        using (var multipart = new MultipartFormDataContent())
+        {
+            var fileContent = new ByteArrayContent(imageBytes);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            multipart.Add(fileContent, "image", "attempt.jpg");
+            multipart.Add(new StringContent(sessionId.ToString()), "sessionId");
+
+            var secondResponse = await client.PostAsync("/api/recognition/attempt", multipart);
+            Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+
+            var result = await secondResponse.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+            Assert.NotNull(result);
+            Assert.True(result.Success);
+            Assert.Equal("Attendance already marked.", result.Message);
+            Assert.Equal(initialMarkedAt, result.MarkedAt);
+        }
+
+        // Verify database: MarkedAt has NOT changed, but RecognitionLogs has 2 entries
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = await db.AttendanceSessions.Include(s => s.Entries).SingleAsync(s => s.Id == sessionId);
+            Assert.Equal(initialMarkedAt, session.Entries.Single().MarkedAt);
+
+            var logs = await db.RecognitionLogs.OrderBy(l => l.AttemptedAt).ToListAsync();
+            Assert.Equal(2, logs.Count);
+            Assert.All(logs, l => Assert.True(l.IsSuccess));
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenEmptyImage_ReturnsBadRequest_AndCreatesFailedRecognitionLog()
+    {
+        var (client, services) = CreateClientWithIsolatedDb();
+
+        using var content = new ByteArrayContent([]);
+        content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var response = await client.PostAsync("/api/recognition/attempt", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+
+        // Verify failed log was created
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var log = await db.RecognitionLogs.SingleAsync();
+            Assert.False(log.IsSuccess);
+            Assert.NotNull(log.ErrorMessage);
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenNoFaceDetected_ReturnsGracefulResponse_AndCreatesFailedRecognitionLog()
+    {
+        // Custom face detection service returning FaceDetected = false
+        var (client, services) = CreateClientWithIsolatedDb(services =>
+        {
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceDetectionService));
+            if (descriptor is not null)
+                services.Remove(descriptor);
+
+            services.AddScoped<IFaceDetectionService, MockNoFaceDetectionService>();
+        });
+
+        var dummyBytes = new byte[] { 1, 2, 3 };
+        using var content = new ByteArrayContent(dummyBytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var response = await client.PostAsync("/api/recognition/attempt", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Equal("No face detected in image.", result.Message);
+
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var log = await db.RecognitionLogs.SingleAsync();
+            Assert.False(log.IsSuccess);
+            Assert.Equal("No face detected in image.", log.ErrorMessage);
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenMatchedEmployeeIsInactive_RejectsAttendance_AndCreatesFailedLog()
+    {
+        var (client, services) = CreateClientWithIsolatedDb();
+        var imageBytes = new byte[] { 50, 60, 70, 80 };
+
+        var extractor = new TestFaceEmbeddingExtractor();
+        var embedding = await extractor.ExtractEmbeddingAsync(imageBytes);
+
+        Guid sessionId;
+        Guid employeeId;
+
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var employee = new Employee("EMP009", "Inactive Bob", isAdmin: false);
+            employee.AddFaceEmbedding(embedding);
+            employee.Deactivate(); // Set to Inactive
+            db.Employees.Add(employee);
+
+            var roster = new List<(Guid, string, string)> { (employee.Id, employee.EmployeeCode, employee.FullName) };
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), roster);
+            db.AttendanceSessions.Add(session);
+
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+            employeeId = employee.Id;
+        }
+
+        using var content = new ByteArrayContent(imageBytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var response = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Equal("Access Denied — Inactive Employee", result.Message);
+
+        // Verify DB: AttendanceEntry status is STILL Absent
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = await db.AttendanceSessions.Include(s => s.Entries).SingleAsync(s => s.Id == sessionId);
+            var entry = Assert.Single(session.Entries);
+            Assert.Equal(AttendanceStatus.Absent, entry.Status);
+            Assert.Null(entry.MarkedAt);
+
+            // Verify failed recognition log
+            var log = await db.RecognitionLogs.SingleAsync();
+            Assert.False(log.IsSuccess);
+            Assert.Equal(employeeId, log.EmployeeId);
+            Assert.Equal("EMP009", log.MatchedEmployeeCode);
+            Assert.Equal("Access Denied — Inactive Employee", log.ErrorMessage);
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenConsecutiveUnknownFacesDetected_ReturnsUnauthorized401()
+    {
+        var (client, services) = CreateClientWithIsolatedDb(services =>
+        {
+            var matchingSvcDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceMatchingService));
+            if (matchingSvcDescriptor is not null)
+                services.Remove(matchingSvcDescriptor);
+
+            // Matching service that always returns no match (unknown face)
+            services.AddScoped<IFaceMatchingService, MockUnknownFaceMatchingService>();
+        });
+
+        Guid sessionId;
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), []);
+            db.AttendanceSessions.Add(session);
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        var dummyBytes = new byte[] { 1, 2, 3 };
+
+        // Attempt 1: returns 200 OK with success=false
+        using (var content1 = new ByteArrayContent(dummyBytes))
+        {
+            content1.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res1 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content1);
+            Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+        }
+
+        // Attempt 2: returns 200 OK with success=false
+        using (var content2 = new ByteArrayContent(dummyBytes))
+        {
+            content2.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res2 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content2);
+            Assert.Equal(HttpStatusCode.OK, res2.StatusCode);
+        }
+
+        // Attempt 3: threshold reached -> returns 401 Unauthorized
+        using (var content3 = new ByteArrayContent(dummyBytes))
+        {
+            content3.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res3 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content3);
+            Assert.Equal(HttpStatusCode.Unauthorized, res3.StatusCode);
+
+            var body3 = await res3.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+            Assert.NotNull(body3);
+            Assert.False(body3.Success);
+            Assert.Contains("Consecutive unknown faces", body3.Message);
+        }
+    }
+
+    [Fact]
+    public async Task Attempt_WhenModelFailsOrMissing_ReturnsGracefulFallbackToPinMode()
+    {
+        var (client, services) = CreateClientWithIsolatedDb(services =>
+        {
+            var extractorDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFaceEmbeddingExtractor));
+            if (extractorDescriptor is not null)
+                services.Remove(extractorDescriptor);
+
+            // Extractor throwing FileNotFoundException (missing model)
+            services.AddScoped<IFaceEmbeddingExtractor, MockFailingEmbeddingExtractor>();
+        });
+
+        Guid sessionId;
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = AttendanceSession.Create("Engineering", DateOnly.FromDateTime(DateTime.Today), []);
+            db.AttendanceSessions.Add(session);
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        using var content = new ByteArrayContent(new byte[] { 1, 2, 3 });
+        content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var response = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.True(result.FallbackToPin);
+        Assert.Contains("PIN", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DeviceFlow_SimulateFullLifecycle_MarkOnce_MarkDuplicate_MarkBadImage()
+    {
+        var (client, services) = CreateClientWithIsolatedDb();
+        var validImageBytes = new byte[] { 101, 102, 103 };
+
+        var extractor = new TestFaceEmbeddingExtractor();
+        var embedding = await extractor.ExtractEmbeddingAsync(validImageBytes);
+
+        Guid sessionId;
+
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var employee = new Employee("EMP100", "Charlie Chaplin", isAdmin: false);
+            employee.AddFaceEmbedding(embedding);
+            db.Employees.Add(employee);
+
+            var roster = new List<(Guid, string, string)> { (employee.Id, employee.EmployeeCode, employee.FullName) };
+            var session = AttendanceSession.Create("Production", DateOnly.FromDateTime(DateTime.Today), roster);
+            db.AttendanceSessions.Add(session);
+
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        // 1. Mark once (success)
+        using (var content1 = new ByteArrayContent(validImageBytes))
+        {
+            content1.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res1 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content1);
+            Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+            var body1 = await res1.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+            Assert.True(body1!.Success);
+            Assert.Equal("Attendance marked successfully.", body1.Message);
+        }
+
+        // 2. Mark again (duplicate handled correctly)
+        using (var content2 = new ByteArrayContent(validImageBytes))
+        {
+            content2.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res2 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", content2);
+            Assert.Equal(HttpStatusCode.OK, res2.StatusCode);
+            var body2 = await res2.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+            Assert.True(body2!.Success);
+            Assert.Equal("Attendance already marked.", body2.Message);
+        }
+
+        // 3. Mark bad image (failure handled gracefully)
+        using (var badContent = new ByteArrayContent([]))
+        {
+            badContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            var res3 = await client.PostAsync($"/api/recognition/attempt?sessionId={sessionId}", badContent);
+            Assert.Equal(HttpStatusCode.BadRequest, res3.StatusCode);
+            var body3 = await res3.Content.ReadFromJsonAsync<RecognitionAttemptTestResponse>();
+            Assert.False(body3!.Success);
+        }
+
+        // Verify database final state
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = await db.AttendanceSessions.Include(s => s.Entries).SingleAsync(s => s.Id == sessionId);
+            var entry = Assert.Single(session.Entries);
+            Assert.Equal(AttendanceStatus.Present, entry.Status);
+
+            var logs = await db.RecognitionLogs.ToListAsync();
+            Assert.Equal(3, logs.Count);
+            Assert.Equal(2, logs.Count(l => l.IsSuccess));
+            Assert.Equal(1, logs.Count(l => !l.IsSuccess));
+        }
+    }
+
+    private class MockNoFaceDetectionService : IFaceDetectionService
+    {
+        public Task<FaceDetectionResult> DetectFacesAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new FaceDetectionResult(faceDetected: false, faceCount: 0));
+        }
+    }
+
+    private class MockUnknownFaceMatchingService : IFaceMatchingService
+    {
+        public double CalculateDistance(float[] vectorA, float[] vectorB) => 1.0;
+        public FaceMatchResult Match(float[] vectorA, float[] vectorB, double? threshold = null) => new(false, 1.0);
+        public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null) =>
+            new(false, 1.0, null);
+    }
+
+    private class MockFailingEmbeddingExtractor : IFaceEmbeddingExtractor
+    {
+        public Task<float[]> ExtractEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            throw new FileNotFoundException("Model file missing");
+        }
+    }
+
+    private class TestFaceEmbeddingExtractor : IFaceEmbeddingExtractor
+    {
+        public Task<float[]> ExtractEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            var vector = new float[128];
+            for (int i = 0; i < Math.Min(imageBytes.Length, 128); i++)
+            {
+                vector[i] = imageBytes[i] / 255.0f;
+            }
+            return Task.FromResult(vector);
+        }
+    }
+
+    private class TestFaceMatchingService : IFaceMatchingService
+    {
+        public double CalculateDistance(float[] vectorA, float[] vectorB)
+        {
+            double sum = 0;
+            for (int i = 0; i < Math.Min(vectorA.Length, vectorB.Length); i++)
+                sum += Math.Pow(vectorA[i] - vectorB[i], 2);
+            return Math.Sqrt(sum);
+        }
+
+        public FaceMatchResult Match(float[] vectorA, float[] vectorB, double? threshold = null)
+        {
+            var dist = CalculateDistance(vectorA, vectorB);
+            return new FaceMatchResult(dist <= (threshold ?? 0.5), dist);
+        }
+
+        public FaceMatchResult FindBestMatch(float[] targetVector, IEnumerable<Employee> candidates, double? threshold = null)
+        {
+            double minDistance = double.MaxValue;
+            Guid? bestEmployeeId = null;
+            foreach (var emp in candidates)
+            {
+                foreach (var emb in emp.FaceEmbeddings)
+                {
+                    if (emb?.Vector == null) continue;
+                    var dist = CalculateDistance(targetVector, emb.Vector);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        bestEmployeeId = emp.Id;
+                    }
+                }
+            }
+            bool isMatch = bestEmployeeId.HasValue && minDistance <= (threshold ?? 0.5);
+            return new FaceMatchResult(isMatch, minDistance, isMatch ? bestEmployeeId : null);
+        }
+    }
+
+    private record RecognitionAttemptTestResponse(
+        bool Success,
+        string Message,
+        Guid? EmployeeId,
+        string? EmployeeCode,
+        string? EmployeeName,
+        DateTimeOffset? MarkedAt,
+        double Confidence,
+        Guid? RecognitionLogId,
+        bool FallbackToPin = false);
+    private class TestFaceDetectionService : IFaceDetectionService
+    {
+        public Task<FaceDetectionResult> DetectFacesAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new FaceDetectionResult(true, 1));
+        }
+    }
+}

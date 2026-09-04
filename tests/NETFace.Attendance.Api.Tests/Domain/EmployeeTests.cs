@@ -11,14 +11,12 @@ public class EmployeeTests
     [Fact]
     public void Constructor_ShouldInitializeWithActiveStatus()
     {
-        // Arrange & Act
-        var employee = new Employee("EMP-001", "John Doe", false);
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
 
-        // Assert
         Assert.Equal(EmployeeStatus.Active, employee.Status);
         Assert.Equal("EMP-001", employee.EmployeeCode);
-        Assert.Equal("John Doe", employee.ProfileDetails);
-        Assert.False(employee.AdminFlag);
+        Assert.Equal("Alice Wonderland", employee.FullName);
+        Assert.False(employee.IsAdmin);
         Assert.NotEqual(Guid.Empty, employee.Id);
         Assert.Empty(employee.FaceEmbeddings);
     }
@@ -26,32 +24,49 @@ public class EmployeeTests
     [Fact]
     public void AddFaceEmbedding_WhenLimitNotReached_ShouldAddEmbedding()
     {
-        // Arrange
-        var employee = new Employee("EMP-001", "John Doe", false);
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
         var vector = new float[] { 0.1f, 0.2f, 0.3f };
 
-        // Act
         employee.AddFaceEmbedding(vector);
-
-        // Assert
         Assert.Single(employee.FaceEmbeddings);
     }
 
     [Fact]
     public void AddFaceEmbedding_WhenLimitReached_ShouldThrowException()
     {
-        // Arrange
-        var employee = new Employee("EMP-001", "John Doe", false);
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
+
         for (int i = 0; i < 5; i++)
         {
-            employee.AddFaceEmbedding(new float[] { 0.1f, 0.2f, 0.3f });
+            employee.AddFaceEmbedding(new float[] { (float)i });
         }
 
-        // Act & Assert
-        var exception = Assert.Throws<MaxFaceEmbeddingsReachedException>(() => 
-            employee.AddFaceEmbedding(new float[] { 0.4f, 0.5f, 0.6f })
-        );
+        var exception = Assert.Throws<MaxFaceEmbeddingsReachedException>(
+            () => employee.AddFaceEmbedding(new float[] { 9.9f }));
 
-        Assert.Equal("An employee can have a maximum of 5 face embeddings.", exception.Message);
+        Assert.Equal("An employee cannot have more than 5 face embeddings.", exception.Message);
+    }
+
+    [Fact]
+    public void Deactivate_ShouldSetStatusToInactive()
+    {
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
+        Assert.Equal(EmployeeStatus.Active, employee.Status);
+
+        employee.Deactivate();
+
+        Assert.Equal(EmployeeStatus.Inactive, employee.Status);
+    }
+
+    [Fact]
+    public void Activate_ShouldSetStatusToActive()
+    {
+        var employee = new Employee("EMP-001", "Alice Wonderland", isAdmin: false);
+        employee.Deactivate();
+
+        employee.Activate();
+
+        Assert.Equal(EmployeeStatus.Active, employee.Status);
     }
 }
+
