@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react';
-import ConfirmModal from '../../../components/ui/ConfirmModal';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, CheckCircle, Clock } from 'lucide-react';
 
 export default function SessionDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null });
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -31,32 +27,6 @@ export default function SessionDetail() {
     fetchSession();
   }, [id]);
 
-  const requestAction = (action) => {
-    setConfirmModal({ isOpen: true, action });
-  };
-
-  const handleAction = async () => {
-    const action = confirmModal.action;
-    setConfirmModal({ isOpen: false, action: null });
-    
-    setActionLoading(true);
-    try {
-      const token = sessionStorage.getItem('adminToken');
-      const res = await fetch(`/api/attendance-sessions/${id}/${action}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (!res.ok) throw new Error(`Failed to ${action} session`);
-      
-      // Navigate back to list or reload
-      navigate('/admin/sessions');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   if (loading) {
     return <div className="page-container">Loading session details...</div>;
@@ -96,37 +66,7 @@ export default function SessionDetail() {
             </span>
           </div>
         </div>
-
-        {session.status === 'Active' && (
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button 
-              className="btn-secondary" 
-              style={{ color: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}
-              onClick={() => requestAction('cancel')}
-              disabled={actionLoading}
-            >
-              Cancel Session
-            </button>
-            <button 
-              className="btn-primary" 
-              onClick={() => requestAction('finalize')}
-              disabled={actionLoading}
-            >
-              Finalize Session
-            </button>
-          </div>
-        )}
       </div>
-
-      <ConfirmModal 
-        isOpen={confirmModal.isOpen}
-        title={confirmModal.action === 'cancel' ? 'Cancel Session' : 'Finalize Session'}
-        message={`Are you sure you want to ${confirmModal.action} this session? This action cannot be undone.`}
-        isDanger={confirmModal.action === 'cancel'}
-        confirmText={confirmModal.action === 'cancel' ? 'Cancel Session' : 'Finalize'}
-        onConfirm={handleAction}
-        onCancel={() => setConfirmModal({ isOpen: false, action: null })}
-      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
@@ -151,7 +91,6 @@ export default function SessionDetail() {
               <th style={{ padding: '1rem' }}>Employee Code</th>
               <th style={{ padding: '1rem' }}>Name</th>
               <th style={{ padding: '1rem' }}>Status</th>
-              <th style={{ padding: '1rem' }}>Marked At</th>
             </tr>
           </thead>
           <tbody>
@@ -166,9 +105,6 @@ export default function SessionDetail() {
                     {entry.status === 'Present' ? <CheckCircle size={16} /> : <Clock size={16} />}
                     {entry.status}
                   </div>
-                </td>
-                <td style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                  {entry.markedAt ? new Date(entry.markedAt).toLocaleString() : '-'}
                 </td>
               </tr>
             ))}

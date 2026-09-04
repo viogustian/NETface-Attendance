@@ -80,7 +80,7 @@ public class AttendanceSessionsControllerTests : IClassFixture<WebApplicationFac
         var body = await response.Content.ReadFromJsonAsync<SessionResponse>();
         Assert.NotNull(body);
         Assert.Equal("Engineering", body.DepartmentName);
-        Assert.Equal(3, body.EntriesCount);
+        Assert.Equal(3, body!.Entries.Count);
     }
 
     [Fact]
@@ -115,8 +115,8 @@ public class AttendanceSessionsControllerTests : IClassFixture<WebApplicationFac
         var body = await cancelResponse.Content.ReadFromJsonAsync<SessionResponse>();
         Assert.NotNull(body);
         Assert.Equal("Cancelled", body.Status);
-        Assert.Equal(2, body.EntriesCount);
+        Assert.Equal(2, body!.Entries.Count);
     }
 
-    private record SessionResponse(Guid Id, string DepartmentName, string Date, string Status, int EntriesCount);
+    private record SessionResponse(Guid Id, string DepartmentName, string Date, string Status, List<System.Text.Json.JsonElement> Entries);
 }

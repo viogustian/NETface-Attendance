@@ -89,5 +89,5 @@ public class AttendanceSessionsController(AppDbContext db) : ControllerBase
     }
 
     private static AttendanceSessionResponse ToResponse(AttendanceSession s) =>
-        new(s.Id, s.DepartmentName, s.Date.ToString("yyyy-MM-dd"), s.Status.ToString(), s.Entries.Count);
+        new(s.Id, s.DepartmentName, s.Date.ToString("yyyy-MM-dd"), s.Status.ToString(), s.Entries.Select(e => new AttendanceEntryResponse(e.Id, e.EmployeeId, e.EmployeeCode, e.EmployeeName, e.Status.ToString())).ToList());
 }

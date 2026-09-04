@@ -19,4 +19,4 @@ public record AttendanceSessionResponse(
     string DepartmentName,
     string Date,
     string Status,
-    int EntriesCount);
+    List<AttendanceEntryResponse> Entries);
