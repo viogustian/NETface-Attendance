@@ -65,19 +65,19 @@ export default function CreateEmployee() {
   };
 
   return (
-    <div className="page-container animate-fade-in">
+    <div className="animate-fade-in">
       <Link to="/admin/employees" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
         <ArrowLeft size={16} /> Back to Employees
       </Link>
       
       <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>
           <UserPlus color="var(--primary-color)" /> Add New Employee
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Register a new employee for attendance tracking.</p>
+        <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Register a new employee for attendance tracking.</p>
       </div>
 
-      <div className="glass-panel" style={{ maxWidth: '600px', padding: '2rem' }}>
+      <div className="card" style={{ maxWidth: '600px', padding: '2rem' }}>
         <AlertError message={error} />
 
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -110,7 +110,7 @@ export default function CreateEmployee() {
               style={{ width: '1.2rem', height: '1.2rem', accentColor: 'var(--primary-color)' }}
               {...register('isAdmin')} 
             />
-            <label htmlFor="isAdmin" style={{ fontWeight: '500' }}>
+            <label htmlFor="isAdmin" style={{ fontWeight: '500', color: 'var(--galaxy-black)' }}>
               Grant Admin Privileges
               <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>
                 Allows the user to access the Admin Dashboard.

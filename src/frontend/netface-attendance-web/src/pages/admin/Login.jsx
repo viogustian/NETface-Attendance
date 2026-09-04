@@ -51,12 +51,12 @@ export default function Login() {
   };
 
   return (
-    <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-      <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+    <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#fcfcfc' }}>
+      <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <KeyRound size={48} color="var(--primary-color)" style={{ marginBottom: '1rem' }} />
-          <h2>Admin Login</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>Sign in to NETFace Admin</p>
+          <h2 style={{ color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>Admin Login</h2>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Sign in to NETFace Admin</p>
         </div>
 
         <AlertError message={error} />
