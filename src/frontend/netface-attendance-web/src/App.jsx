@@ -8,7 +8,8 @@ import CreateEmployee from './pages/admin/CreateEmployee';
 import SessionList from './pages/admin/sessions/SessionList';
 import CreateSession from './pages/admin/sessions/CreateSession';
 import SessionDetail from './pages/admin/sessions/SessionDetail';
-import KioskApp from './pages/kiosk/KioskApp';
+import KioskLayout from './components/layouts/KioskLayout';
+import KioskHome from './pages/kiosk/KioskHome';
 
 function App() {
   return (
@@ -30,7 +31,9 @@ function App() {
         </Route>
 
         {/* Kiosk Routes */}
-        <Route path="/kiosk/*" element={<KioskApp />} />
+        <Route path="/kiosk" element={<KioskLayout />}>
+          <Route index element={<KioskHome />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
