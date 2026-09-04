@@ -5,10 +5,19 @@ import * as z from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, UserPlus } from 'lucide-react';
 import AlertError from '../../components/ui/AlertError';
+import { getToken } from '../../utils/auth';
 
 const employeeSchema = z.object({
-  employeeCode: z.string().min(1, 'Employee Code is required').max(20, 'Employee Code is too long'),
-  fullName: z.string().min(1, 'Full Name is required').max(100, 'Full Name is too long'),
+  employeeCode: z
+    .string()
+    .trim()
+    .min(1, 'Employee Code is required')
+    .max(20, 'Employee Code is too long'),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, 'Full Name is required')
+    .max(100, 'Full Name is too long'),
   isAdmin: z.boolean().default(false),
 });
 
@@ -26,7 +35,7 @@ export default function CreateEmployee() {
   const onSubmit = async (data) => {
     setError(null);
     try {
-      const token = sessionStorage.getItem('adminToken');
+      const token = getToken();
       const response = await fetch('/api/employees', {
         method: 'POST',
         headers: { 
@@ -37,13 +46,21 @@ export default function CreateEmployee() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to create employee');
+        let errorMessage = 'Failed to create employee';
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch {
+          // fallback if response is not valid json
+        }
+        throw new Error(errorMessage);
       }
       
       navigate('/admin/employees');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An unexpected error occurred');
     }
   };
 
