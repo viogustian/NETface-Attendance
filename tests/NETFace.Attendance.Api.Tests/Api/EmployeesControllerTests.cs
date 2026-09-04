@@ -36,9 +36,13 @@ public class EmployeesControllerTests : IClassFixture<WebApplicationFactory<Prog
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    /// <summary>
+    /// Creates a new client backed by an isolated in-memory database.
+    /// Each call produces a fresh database to prevent test data leakage.
+    /// </summary>
     private HttpClient CreateClientWithIsolatedDb()
     {
-        var dbName = Guid.NewGuid().ToString();
+        var dbName = $"InMemoryDb_{Guid.NewGuid()}";
         var client = _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
