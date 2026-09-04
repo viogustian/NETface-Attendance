@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react';
-import ConfirmModal from '../../components/ui/ConfirmModal';
+import ConfirmModal from '../../../components/ui/ConfirmModal';
 
 export default function SessionDetail() {
   const { id } = useParams();

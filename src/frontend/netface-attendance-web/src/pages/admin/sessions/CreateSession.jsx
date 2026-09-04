@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, CalendarPlus, Users } from 'lucide-react';
-import AlertError from '../../components/ui/AlertError';
+import AlertError from '../../../components/ui/AlertError';
 
 const sessionSchema = z.object({
   departmentName: z.string().min(1, 'Department Name is required'),
@@ -82,7 +82,8 @@ export default function CreateSession() {
         throw new Error(errorData.message || 'Failed to create session');
       }
       
-      navigate('/admin/sessions');
+      const createdSession = await response.json();
+      navigate(`/admin/sessions/${createdSession.id}`);
     } catch (err) {
       setError(err.message);
     }
