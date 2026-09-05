@@ -15,3 +15,14 @@ export const clearToken = () => {
 export const isAuthenticated = () => {
   return Boolean(getToken());
 };
+
+export const requiresPasswordChange = () => {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.requiresPasswordChange === 'true' || payload.requiresPasswordChange === true;
+  } catch {
+    return false;
+  }
+};

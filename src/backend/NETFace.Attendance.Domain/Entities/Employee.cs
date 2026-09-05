@@ -16,6 +16,8 @@ public class Employee
     public string FullName { get; private set; }
     public EmployeeStatus Status { get; private set; }
     public bool IsAdmin { get; private set; }
+    public string? PasswordHash { get; private set; }
+    public bool RequiresPasswordChange { get; private set; } = true;
     public IReadOnlyCollection<FaceEmbedding> FaceEmbeddings => _faceEmbeddings.AsReadOnly();
 
     // EF Core constructor
@@ -39,6 +41,17 @@ public class Employee
             throw new MaxFaceEmbeddingsReachedException();
 
         _faceEmbeddings.Add(new FaceEmbedding(vector));
+    }
+
+    public void SetPassword(string hash)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hash);
+        PasswordHash = hash;
+    }
+
+    public void SetRequiresPasswordChange(bool requires)
+    {
+        RequiresPasswordChange = requires;
     }
 
     public void ClearFaceEmbeddings()

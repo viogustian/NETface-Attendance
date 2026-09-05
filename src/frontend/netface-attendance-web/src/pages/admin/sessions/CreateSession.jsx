@@ -93,14 +93,14 @@ export default function CreateSession() {
       </Link>
       
       <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>
           <CalendarPlus color="var(--primary-color)" /> Create Attendance Session
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Start a new session for a specific department. Date will automatically follow server time.</p>
+        <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Start a new session for a specific department. Date will automatically follow server time.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem' }}>
-        <div className="glass-panel" style={{ padding: '2rem' }}>
+        <div className="card" style={{ padding: '2rem' }}>
           <AlertError message={error} />
 
           <form id="create-session-form" onSubmit={handleSubmit(onSubmit)}>
@@ -124,9 +124,9 @@ export default function CreateSession() {
         </div>
 
         {/* Roster Selection Sidebar */}
-        <div className="glass-panel" style={{ padding: '1.5rem', height: 'fit-content' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <Users size={20} /> Select Roster
+        <div className="card" style={{ padding: '1.5rem', height: 'fit-content' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--galaxy-black)' }}>
+            <Users size={20} color="var(--primary-color)" /> Select Roster
           </h3>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
             Select the active employees expected to attend this session.
@@ -144,7 +144,7 @@ export default function CreateSession() {
                 render={({ field }) => (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {employees.map(emp => (
-                      <label key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', cursor: 'pointer' }}>
+                      <label key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', border: '1px solid var(--surface-border)', borderRadius: '8px', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                         <input
                           type="checkbox"
                           value={emp.id}
@@ -159,7 +159,7 @@ export default function CreateSession() {
                           checked={field.value.includes(emp.id)}
                         />
                         <div>
-                          <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>{emp.fullName}</div>
+                          <div style={{ fontWeight: '500', fontSize: '0.9rem', color: 'var(--galaxy-black)' }}>{emp.fullName}</div>
                           <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{emp.employeeCode}</div>
                         </div>
                       </label>

@@ -167,6 +167,7 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.False(string.IsNullOrWhiteSpace(body.Token));
         Assert.Equal("ADM001", body.EmployeeCode);
         Assert.Equal("Admin Boss", body.FullName);
+        Assert.True(body.RequiresPasswordChange);
     }
 
     [Fact]
@@ -248,5 +249,5 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private record LoginResponse(string Token, string EmployeeCode, string FullName);
+    private record LoginResponse(string Token, string EmployeeCode, string FullName, bool RequiresPasswordChange);
 }

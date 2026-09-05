@@ -52,13 +52,13 @@ export default function EmployeeList() {
   };
 
   return (
-    <div className="page-container animate-fade-in">
+    <div className="animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>
             <Users color="var(--primary-color)" /> Employees
           </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Manage your organization's employees.</p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Manage your organization's employees.</p>
         </div>
         <Link to="/admin/employees/create" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
           <Plus size={18} /> Add Employee
@@ -67,34 +67,26 @@ export default function EmployeeList() {
 
       <AlertError message={error} />
 
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
+      <div className="data-table-container">
         {loading ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.02)' }}>
-                <th style={{ padding: '1rem' }}>Code</th>
-                <th style={{ padding: '1rem' }}>Full Name</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Role</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>Code</th>
+                <th>Full Name</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {[...Array(5)].map((_, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  <td style={{ padding: '1rem' }}>
-                    <Skeleton width="80px" height="1.2rem" />
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <Skeleton width="180px" height="1.2rem" />
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <Skeleton width="60px" height="1.2rem" borderRadius="12px" />
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <Skeleton width="70px" height="1.2rem" />
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                <tr key={idx}>
+                  <td><Skeleton width="80px" height="1.2rem" /></td>
+                  <td><Skeleton width="180px" height="1.2rem" /></td>
+                  <td><Skeleton width="60px" height="1.5rem" borderRadius="12px" /></td>
+                  <td><Skeleton width="70px" height="1.2rem" /></td>
+                  <td style={{ textAlign: 'right' }}>
                     <Skeleton width="100px" height="1.8rem" borderRadius="4px" style={{ marginLeft: 'auto' }} />
                   </td>
                 </tr>
@@ -103,53 +95,46 @@ export default function EmployeeList() {
           </table>
         ) : employees.length === 0 ? (
           <div style={{ padding: '4rem 2rem', textAlign: 'center' }} data-testid="empty-state">
-            <Users size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5 }} />
-            <h3>No employees found</h3>
+            <Users size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+            <h3 style={{ color: 'var(--galaxy-black)', fontSize: '1.25rem', marginBottom: '0.5rem' }}>No employees found</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Get started by adding your first employee.</p>
             <Link to="/admin/employees/create" className="btn-secondary" style={{ display: 'inline-block' }}>
               Add Employee
             </Link>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.02)' }}>
-                <th style={{ padding: '1rem' }}>Code</th>
-                <th style={{ padding: '1rem' }}>Full Name</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Role</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>Code</th>
+                <th>Full Name</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {employees.map((emp) => (
-                <tr key={emp.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  <td style={{ padding: '1rem', fontWeight: '500' }}>{emp.employeeCode}</td>
-                  <td style={{ padding: '1rem' }}>{emp.fullName}</td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ 
-                      padding: '0.25rem 0.5rem', 
-                      borderRadius: '12px', 
-                      fontSize: '0.75rem', 
-                      fontWeight: '500',
-                      background: emp.status === 'Active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: emp.status === 'Active' ? 'var(--success-color)' : 'var(--danger-color)'
-                    }}>
+                <tr key={emp.id}>
+                  <td style={{ fontWeight: '500', color: 'var(--galaxy-black)' }}>{emp.employeeCode}</td>
+                  <td style={{ color: 'var(--galaxy-black)' }}>{emp.fullName}</td>
+                  <td>
+                    <span className={`badge ${emp.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>
                       {emp.status}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
+                  <td style={{ color: 'var(--text-secondary)' }}>
                     {emp.isAdmin ? 'Admin' : 'Employee'}
                   </td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <Link to={`/admin/employees/${emp.id}/faces`} className="btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-                        Face Enrollment ({emp.enrolledFacesCount}/5)
+                      <Link to={`/admin/employees/${emp.id}/faces`} className="btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}>
+                        Faces ({emp.enrolledFacesCount}/5)
                       </Link>
                       <button 
                         onClick={() => handleDelete(emp.id)} 
                         className="btn-danger" 
-                        style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--danger-color)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
                       >
                         Delete
                       </button>

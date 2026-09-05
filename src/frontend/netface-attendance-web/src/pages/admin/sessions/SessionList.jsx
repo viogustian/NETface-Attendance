@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Plus, ExternalLink, Trash2 } from 'lucide-react';
+import { Calendar, Plus } from 'lucide-react';
 
 export default function SessionList() {
   const [sessions, setSessions] = useState([]);
@@ -67,10 +67,10 @@ export default function SessionList() {
     <div className="page-container animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>
             <Calendar color="var(--primary-color)" /> Attendance Sessions
           </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Manage and monitor attendance sessions.</p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Manage and monitor attendance sessions.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <input 
@@ -86,69 +86,69 @@ export default function SessionList() {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
+      <div className="data-table-container">
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
             Loading sessions...
           </div>
         ) : filteredSessions.length === 0 ? (
           <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-            <Calendar size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5 }} />
-            <h3>No sessions found</h3>
+            <Calendar size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+            <h3 style={{ color: 'var(--galaxy-black)', fontSize: '1.25rem', marginBottom: '0.5rem' }}>No sessions found</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Start by creating a new attendance session or change your filter.</p>
             <Link to="/admin/sessions/create" className="btn-secondary" style={{ display: 'inline-block' }}>
               Create Session
             </Link>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.02)' }}>
-                <th style={{ padding: '1rem' }}>Department</th>
-                <th style={{ padding: '1rem' }}>Date</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Attendance</th>
-                <th style={{ padding: '1rem' }}>Actions</th>
+              <tr>
+                <th>Department</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Attendance</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredSessions.map((session) => (
-                <tr key={session.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  <td style={{ padding: '1rem', fontWeight: '500' }}>{session.departmentName}</td>
-                  <td style={{ padding: '1rem' }}>{session.date}</td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ 
-                      padding: '0.25rem 0.5rem', 
-                      borderRadius: '12px', 
-                      fontSize: '0.75rem', 
-                      fontWeight: '500',
-                      background: session.status === 'Active' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(148, 163, 184, 0.1)',
-                      color: session.status === 'Active' ? 'var(--primary-color)' : 'var(--text-secondary)'
-                    }}>
+                <tr key={session.id}>
+                  <td style={{ fontWeight: '500', color: 'var(--galaxy-black)' }}>{session.departmentName}</td>
+                  <td style={{ color: 'var(--galaxy-black)' }}>{session.date}</td>
+                  <td>
+                    <span className={`badge ${
+                      session.status === 'Active' ? 'badge-success' : 
+                      session.status === 'Cancelled' ? 'badge-danger' : ''
+                    }`} style={
+                      (session.status !== 'Active' && session.status !== 'Cancelled') ? { background: 'rgba(148, 163, 184, 0.1)', color: 'var(--text-secondary)' } : {}
+                    }>
                       {session.status}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--galaxy-black)' }}>
                       <span style={{ fontWeight: '500' }}>{session.presentCount} / {session.totalEmployees}</span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                         ({session.totalEmployees > 0 ? Math.round((session.presentCount / session.totalEmployees) * 100) : 0}%)
                       </span>
                     </div>
                   </td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                       <Link 
                         to={`/admin/sessions/${session.id}`} 
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-color)' }}
+                        className="btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
                       >
-                        View <ExternalLink size={14} />
+                        View
                       </Link>
                       <button 
                         onClick={() => handleDelete(session.id)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', fontWeight: '500', color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        className="btn-danger"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
                       >
-                        Delete <Trash2 size={14} />
+                        Delete
                       </button>
                     </div>
                   </td>

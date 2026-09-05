@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Camera, Upload, Trash2, AlertCircle } from 'lucide-react';
 import { getToken } from '../../utils/auth';
 import AlertError from '../../components/ui/AlertError';
@@ -7,7 +7,6 @@ import AlertSuccess from '../../components/ui/AlertSuccess';
 
 export default function FaceEnrollment() {
   const { id } = useParams();
-  const navigate = useNavigate();
   
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +48,7 @@ export default function FaceEnrollment() {
         videoRef.current.srcObject = mediaStream;
       }
     } catch (err) {
+      console.error(err);
       setError("Failed to access camera. Please allow camera permissions.");
     }
   };
@@ -60,6 +60,7 @@ export default function FaceEnrollment() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => stopCamera(); // Cleanup on unmount
   }, [stream]);
@@ -188,8 +189,8 @@ export default function FaceEnrollment() {
     }
   };
 
-  if (loading) return <div className="page-container">Loading...</div>;
-  if (!employee) return <div className="page-container">Employee not found.</div>;
+  if (loading) return <div className="animate-fade-in" style={{ padding: '2rem' }}>Loading...</div>;
+  if (!employee) return <div className="animate-fade-in" style={{ padding: '2rem' }}>Employee not found.</div>;
 
   const currentCount = employee.enrolledFacesCount || 0;
   const isFull = currentCount >= 5;
@@ -201,25 +202,25 @@ export default function FaceEnrollment() {
   }
 
   return (
-    <div className="page-container animate-fade-in">
+    <div className="animate-fade-in">
       <Link to="/admin/employees" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
         <ArrowLeft size={16} /> Back to Employees
       </Link>
       
       <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>
           <Camera color="var(--primary-color)" /> Face Enrollment
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Daftarkan data wajah untuk {employee.fullName} ({employee.employeeCode}).</p>
+        <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Daftarkan data wajah untuk <strong style={{ color: 'var(--galaxy-black)' }}>{employee.fullName}</strong> ({employee.employeeCode}).</p>
       </div>
 
       <AlertError message={error} />
       <AlertSuccess message={success} />
 
-      <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-        <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Status Pendaftaran Wajah</h3>
-        <div style={{ background: 'var(--bg-primary)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+      <div className="card" style={{ padding: '2rem', marginBottom: '2rem' }}>
+        <h3 style={{ marginBottom: '1.25rem', color: 'var(--galaxy-black)', fontWeight: '600' }}>Status Pendaftaran Wajah</h3>
+        <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--surface-border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: 'var(--galaxy-black)' }}>
             <span style={{ fontWeight: '600' }}>Registered</span>
             <span style={{ fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '2px', color: isFull ? 'var(--danger-color)' : 'var(--primary-color)' }}>
               [{blocks.join('')}] {currentCount} / 5
@@ -234,7 +235,7 @@ export default function FaceEnrollment() {
               className="btn-danger" 
               onClick={handleClearFaces}
               disabled={currentCount === 0 || submitting}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'var(--danger-color)', color: 'white', border: 'none', borderRadius: '4px', cursor: (currentCount === 0 || submitting) ? 'not-allowed' : 'pointer', opacity: (currentCount === 0 || submitting) ? 0.5 : 1 }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}
             >
               <Trash2 size={16} /> Clear Faces
             </button>
@@ -242,18 +243,18 @@ export default function FaceEnrollment() {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '2rem', opacity: isFull ? 0.5 : 1 }}>
-        <h3 style={{ marginBottom: '1rem' }}>Tambah Wajah Baru</h3>
+      <div className="card" style={{ padding: '2rem', opacity: isFull ? 0.5 : 1 }}>
+        <h3 style={{ marginBottom: '1.25rem', color: 'var(--galaxy-black)', fontWeight: '600' }}>Tambah Wajah Baru</h3>
         
         {isFull ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--danger-color)', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--danger-color)', padding: '1rem', background: 'rgba(206, 48, 129, 0.1)', borderRadius: '4px' }}>
             <AlertCircle size={20} />
             Employee sudah memiliki 5 face embedding. Hapus/reset embedding lama untuk mendaftarkan wajah baru.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
             <div>
-              <div style={{ marginBottom: '1rem', background: '#000', borderRadius: '8px', overflow: 'hidden', aspectRatio: '4/3', position: 'relative' }}>
+              <div style={{ marginBottom: '1rem', background: '#000', borderRadius: '12px', overflow: 'hidden', aspectRatio: '4/3', position: 'relative' }}>
                 <video 
                   ref={videoRef} 
                   autoPlay 
@@ -262,7 +263,7 @@ export default function FaceEnrollment() {
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: stream ? 'block' : 'none' }} 
                 />
                 {!stream && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>
                     Camera Offline
                   </div>
                 )}
@@ -308,16 +309,16 @@ export default function FaceEnrollment() {
             <div>
               <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Foto yang akan dikirim (Max 3/batch):</h4>
               {capturedImages.length === 0 ? (
-                <div style={{ padding: '2rem', border: '2px dashed var(--border-color)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <div style={{ padding: '2rem', border: '2px dashed var(--surface-border)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                   Belum ada foto yang diambil.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {capturedImages.map((file, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem', background: 'var(--bg-primary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid var(--surface-border)' }}>
                       <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
                       <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontSize: '0.9rem' }}>{file.name}</div>
+                        <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontSize: '0.9rem', color: 'var(--galaxy-black)', fontWeight: '500' }}>{file.name}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{(file.size / 1024).toFixed(1)} KB</div>
                       </div>
                       <button 

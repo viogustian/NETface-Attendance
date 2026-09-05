@@ -158,197 +158,212 @@ export default function KioskHome({ checkIntervalMs = 1000 }) {
     <div
       style={{
         position: 'relative',
-        width: '100%',
-        height: '100%',
+        width: '100vw',
+        height: '100vh',
         overflow: 'hidden',
-        background: '#020617'
+        background: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}
     >
-      {/* Webcam Background Video */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          minWidth: '100%',
-          minHeight: '100%',
-          width: 'auto',
-          height: 'auto',
-          transform: 'translateX(-50%) translateY(-50%) scaleX(-1)', // Mirror effect
-          objectFit: 'cover'
-        }}
-      />
+      <div style={{ position: 'absolute', top: '2rem', left: '2rem' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#2A282A', letterSpacing: '-0.5px', margin: 0 }}>
+          NETFace Kiosk
+        </h1>
+      </div>
 
-      {/* Hidden offscreen canvas for lightweight motion pre-detection */}
-      <canvas ref={canvasRef} width="64" height="48" style={{ display: 'none' }} />
+      <div style={{
+        position: 'relative',
+        width: '640px',
+        maxWidth: '90vw',
+        aspectRatio: '4/3',
+        borderRadius: '24px',
+        boxShadow: '0 25px 50px -12px rgba(42, 40, 42, 0.25)',
+        background: '#2A282A',
+        overflow: 'hidden'
+      }}>
+        {/* Webcam Background Video */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: 'scaleX(-1)' // Mirror effect
+          }}
+        />
 
-      {/* UI Overlay */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          padding: '2rem',
-          background:
-            'radial-gradient(circle at center, transparent 40%, rgba(2, 6, 23, 0.75) 100%)',
-          pointerEvents: 'none'
-        }}
-      >
-        {/* Top Status Badge */}
+        {/* Hidden offscreen canvas for lightweight motion pre-detection */}
+        <canvas ref={canvasRef} width="64" height="48" style={{ display: 'none' }} />
+
+        {/* UI Overlay */}
         <div
           style={{
+            position: 'absolute',
+            inset: 0,
             display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center'
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: '1.5rem',
+            background: 'linear-gradient(to bottom, rgba(42, 40, 42, 0.4) 0%, transparent 20%, transparent 80%, rgba(42, 40, 42, 0.6) 100%)',
+            pointerEvents: 'none'
           }}
         >
+          {/* Top Status Badge */}
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              background: 'rgba(15, 23, 42, 0.75)',
-              padding: '0.5rem 1rem',
-              borderRadius: '9999px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(8px)'
+              justifyContent: 'flex-end',
+              alignItems: 'center'
             }}
           >
             <div
               style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                background: streamActive ? '#22c55e' : '#ef4444',
-                boxShadow: streamActive ? '0 0 10px #22c55e' : 'none'
-              }}
-            />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#f8fafc' }}>
-              {streamActive ? 'Live' : 'Camera Disconnected'}
-            </span>
-          </div>
-        </div>
-
-        {/* Dynamic Center Feedback States */}
-        <div
-          style={{
-            alignSelf: 'center',
-            textAlign: 'center',
-            marginBottom: '4rem',
-            maxWidth: '480px',
-            width: '100%'
-          }}
-        >
-          {status === 'standby' && (
-            <div
-              style={{
-                color: '#ffffff',
-                textShadow: '0 2px 10px rgba(0,0,0,0.8)'
-              }}
-            >
-              <Camera
-                size={54}
-                style={{
-                  margin: '0 auto 1rem',
-                  opacity: 0.9,
-                  filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))'
-                }}
-              />
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
-                Look at the camera
-              </h2>
-              <p style={{ margin: 0, opacity: 0.85, fontSize: '1rem' }}>
-                Walk up to terminal for automatic attendance recognition
-              </p>
-            </div>
-          )}
-
-          {status === 'capturing' && (
-            <div
-              style={{
-                background: 'rgba(30, 58, 138, 0.85)',
-                border: '1px solid rgba(59, 130, 246, 0.4)',
-                padding: '1.25rem 2.5rem',
-                borderRadius: '16px',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-              }}
-            >
-              <h3 style={{ color: '#ffffff', margin: 0, fontSize: '1.25rem' }}>
-                {statusMessage}
-              </h3>
-            </div>
-          )}
-
-          {status === 'success' && (
-            <div
-              data-testid="success-state-container"
-              style={{
-                background: 'rgba(6, 78, 59, 0.85)',
-                border: '1px solid rgba(16, 185, 129, 0.5)',
-                padding: '2rem 3rem',
-                borderRadius: '20px',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 12px 40px rgba(16, 185, 129, 0.35)',
                 display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: 'rgba(42, 40, 42, 0.75)',
+                padding: '0.5rem 1rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(8px)'
               }}
             >
-              {/* Green Tick */}
-              <CheckCircle
-                data-testid="recognition-success-tick"
-                size={64}
-                color="#4ade80"
+              <div
                 style={{
-                  margin: '0 auto 1rem',
-                  filter: 'drop-shadow(0 0 12px #22c55e)'
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: streamActive ? '#10b981' : '#CE3081',
+                  boxShadow: streamActive ? '0 0 10px #10b981' : 'none'
                 }}
               />
-              <h2 style={{ color: '#ffffff', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>
-                Attendance Recorded
-              </h2>
-              {/* Employee Name */}
-              <p
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#ffffff' }}>
+                {streamActive ? 'Live' : 'Camera Disconnected'}
+              </span>
+            </div>
+          </div>
+
+          {/* Dynamic Center Feedback States */}
+          <div
+            style={{
+              alignSelf: 'center',
+              textAlign: 'center',
+              marginBottom: '2rem',
+              maxWidth: '480px',
+              width: '100%'
+            }}
+          >
+            {status === 'standby' && (
+              <div
                 style={{
-                  color: '#bbf7d0',
-                  marginTop: '0.75rem',
-                  marginBottom: 0,
-                  fontSize: '1.5rem',
-                  fontWeight: 600
+                  color: '#ffffff',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.8)'
                 }}
               >
-                {employeeName}
-              </p>
-            </div>
-          )}
+                <Camera
+                  size={54}
+                  style={{
+                    margin: '0 auto 1rem',
+                    opacity: 0.9,
+                    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))'
+                  }}
+                />
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
+                  Look at the camera
+                </h2>
+                <p style={{ margin: 0, opacity: 0.85, fontSize: '1rem' }}>
+                  Walk up to terminal for automatic attendance recognition
+                </p>
+              </div>
+            )}
 
-          {status === 'error' && (
-            <div
-              style={{
-                background: 'rgba(127, 29, 29, 0.85)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                padding: '1.25rem 2.5rem',
-                borderRadius: '16px',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
-              }}
-            >
-              <AlertCircle size={40} color="#fca5a5" style={{ margin: '0 auto 0.75rem' }} />
-              <h4 style={{ color: '#ffffff', margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>
-                {statusMessage}
-              </h4>
-            </div>
-          )}
+            {status === 'capturing' && (
+              <div
+                style={{
+                  background: 'rgba(239, 148, 46, 0.85)', // Creamsicle
+                  border: '1px solid rgba(239, 148, 46, 0.5)',
+                  padding: '1.25rem 2.5rem',
+                  borderRadius: '16px',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: '0 8px 32px rgba(239, 148, 46, 0.4)'
+                }}
+              >
+                <h3 style={{ color: '#ffffff', margin: 0, fontSize: '1.25rem' }}>
+                  {statusMessage}
+                </h3>
+              </div>
+            )}
+
+            {status === 'success' && (
+              <div
+                data-testid="success-state-container"
+                style={{
+                  background: 'rgba(16, 185, 129, 0.85)', // Success
+                  border: '1px solid rgba(16, 185, 129, 0.5)',
+                  padding: '2rem 3rem',
+                  borderRadius: '20px',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: '0 12px 40px rgba(16, 185, 129, 0.35)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}
+              >
+                <CheckCircle
+                  data-testid="recognition-success-tick"
+                  size={64}
+                  color="#ffffff"
+                  style={{
+                    margin: '0 auto 1rem',
+                    filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.5))'
+                  }}
+                />
+                <h2 style={{ color: '#ffffff', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>
+                  Attendance Recorded
+                </h2>
+                <p
+                  style={{
+                    color: '#ffffff',
+                    marginTop: '0.75rem',
+                    marginBottom: 0,
+                    fontSize: '1.5rem',
+                    fontWeight: 600
+                  }}
+                >
+                  {employeeName}
+                </p>
+              </div>
+            )}
+
+            {status === 'error' && (
+              <div
+                style={{
+                  background: 'rgba(206, 48, 129, 0.85)', // Floral Magenta
+                  border: '1px solid rgba(206, 48, 129, 0.5)',
+                  padding: '1.25rem 2.5rem',
+                  borderRadius: '16px',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: '0 8px 32px rgba(206, 48, 129, 0.4)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}
+              >
+                <AlertCircle size={40} color="#ffffff" style={{ margin: '0 auto 0.75rem' }} />
+                <h4 style={{ color: '#ffffff', margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>
+                  {statusMessage}
+                </h4>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -37,7 +37,8 @@ public class JwtTokenService(IConfiguration configuration) : IJwtTokenService
             new Claim(ClaimTypes.NameIdentifier, employee.Id.ToString()),
             new Claim(ClaimTypes.Name, employee.FullName),
             new Claim("employeeCode", employee.EmployeeCode),
-            new Claim(ClaimTypes.Role, employee.IsAdmin ? "Admin" : "Employee")
+            new Claim(ClaimTypes.Role, employee.IsAdmin ? "Admin" : "Employee"),
+            new Claim("requiresPasswordChange", employee.RequiresPasswordChange.ToString().ToLower())
         };
 
         var token = new JwtSecurityToken(
