@@ -84,8 +84,25 @@ export default function SessionDetail() {
         <div>
           <button 
             className="btn-primary" 
-            onClick={() => {
-              window.open(`/api/attendance-sessions/${id}/export`, '_blank');
+            onClick={async () => {
+              try {
+                const token = sessionStorage.getItem('adminToken');
+                const res = await fetch(`/api/attendance-sessions/${id}/export`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to export CSV');
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${session.departmentName.replace(/\s+/g, '-')}-session-${session.date}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+              } catch (err) {
+                alert(err.message);
+              }
             }}
           >
             Download CSV

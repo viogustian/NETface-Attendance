@@ -44,7 +44,11 @@ export default function Login() {
       
       const result = await response.json();
       setToken(result.token);
-      navigate('/admin');
+      if (result.requiresPasswordChange) {
+        navigate('/admin/change-password');
+      } else {
+        navigate('/admin');
+      }
     } catch (err) {
       setError(err.message || 'An error occurred during login');
     }

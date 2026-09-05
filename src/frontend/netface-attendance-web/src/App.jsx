@@ -10,6 +10,7 @@ import SessionList from './pages/admin/sessions/SessionList';
 import CreateSession from './pages/admin/sessions/CreateSession';
 import SessionDetail from './pages/admin/sessions/SessionDetail';
 import Settings from './pages/admin/Settings';
+import ChangePassword from './pages/admin/ChangePassword';
 import KioskLayout from './components/layouts/KioskLayout';
 import KioskHome from './pages/kiosk/KioskHome';
 
@@ -22,6 +23,7 @@ function App() {
         {/* Admin Routes */}
         <Route path="/admin/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
+          <Route path="/admin/change-password" element={<ChangePassword />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="employees" element={<EmployeeList />} />

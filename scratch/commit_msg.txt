@@ -1,8 +1,0 @@
-feat: add face enrollment, system settings and clock in/out logic
-
-- Added FaceEnrollment and Settings pages to frontend admin panel.
-- Added EmployeesFacesController and SettingsController to backend API.
-- Implemented EnrollmentLog and SystemSetting entities with corresponding EF migrations.
-- Improved AttendanceSessionsController to handle clock in/out with AttendanceEntry updates.
-- Added SFace and YuNet ONNX models for face detection.
-- Updated admin layout, session detail, and employee list components.
