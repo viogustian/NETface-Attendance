@@ -75,3 +75,63 @@ tests/
 docs/
   adr/
 ```
+
+## Contributing
+
+We welcome contributions from the community! To ensure a smooth collaboration process, please follow these guidelines.
+
+### Getting Started
+
+Before you start contributing, you **MUST** fork and star this repository! ⭐
+
+1. **Star the repository** to show your support.
+2. **Fork the repository** to your own GitHub account.
+3. **Clone your fork** locally:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/NETface-Attendance.git
+   ```
+4. Add the original repository as an upstream remote:
+   ```bash
+   git remote add upstream https://github.com/viogustian/NETface-Attendance.git
+   ```
+
+### Development Workflow
+
+Please follow this standard GitHub workflow for all contributions:
+
+1. **Create a branch** for your feature or bug fix:
+   ```bash
+   git checkout -b feature/your-feature-name
+   # or
+   git checkout -b fix/your-bug-fix
+   ```
+2. **Implement your changes**. Be sure to follow the existing code style.
+3. **Run tests locally**. All existing tests must pass before you submit your changes.
+4. **Push your branch** to your forked repository.
+5. **Open a Pull Request (PR)** against the `main` branch of the original repository.
+
+### Branch Naming Convention
+
+- `feature/...` for new features or enhancements.
+- `fix/...` for bug fixes.
+- `docs/...` for documentation updates.
+- `test/...` for adding or fixing tests.
+
+### Testing Requirements
+
+**CRITICAL:** You must run all relevant tests locally **BEFORE** opening a Pull Request.
+If your PR introduces new features or fixes a bug, please include tests that verify your changes.
+
+Local verification flow:
+`Code` → `Test Locally` → `Pass` → `Push Branch` → `Open PR`
+
+### Pull Request Requirements
+
+When opening a Pull Request, please ensure:
+- Your PR description clearly explains the changes and references any related issue(s) (e.g., `Fixes #123`).
+- You do not include unrelated changes in your PR.
+- All required Continuous Integration (CI) checks pass. (If CI fails, please fix the issues and update your PR).
+
+### Good First Issues & Help Wanted
+
+If you are new to the project, look for issues labeled `good first issue` or `help wanted`. These are specifically curated to be approachable and have clear scopes. If you need clarification on any requirements, please feel free to ask in the issue comments before starting work!
