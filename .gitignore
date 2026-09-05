@@ -13,9 +13,16 @@ dist/
 coverage/
 *.local
 
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
 # Local configuration and operating-system files
 .env
 .env.*
 !.env.example
 .DS_Store
 Thumbs.db
+
