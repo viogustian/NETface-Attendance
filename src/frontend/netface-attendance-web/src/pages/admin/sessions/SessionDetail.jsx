@@ -66,17 +66,18 @@ export default function SessionDetail() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ marginBottom: '0.5rem' }}>{session.departmentName} Session</h1>
+          <h1 style={{ marginBottom: '0.5rem', color: 'var(--galaxy-black)', fontSize: '1.5rem', fontWeight: '700' }}>{session.departmentName} Session</h1>
           <div style={{ display: 'flex', gap: '1rem', color: 'var(--text-secondary)' }}>
             <span>Date: {session.date}</span>
-            <span>Status: 
-              <strong style={{ 
-                color: session.status === 'Active' ? 'var(--primary-color)' : 
-                       session.status === 'Cancelled' ? 'var(--danger-color)' : 'var(--success-color)',
-                marginLeft: '0.25rem'
-              }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>Status: 
+              <span className={`badge ${
+                session.status === 'Active' ? 'badge-success' : 
+                session.status === 'Cancelled' ? 'badge-danger' : ''
+              }`} style={
+                (session.status !== 'Active' && session.status !== 'Cancelled') ? { background: 'rgba(148, 163, 184, 0.1)', color: 'var(--text-secondary)' } : {}
+              }>
                 {session.status}
-              </strong>
+              </span>
             </span>
           </div>
         </div>
@@ -92,61 +93,62 @@ export default function SessionDetail() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>{totalCount}</div>
-          <div style={{ color: 'var(--text-secondary)' }}>Total Roster</div>
+      <div className="metrics-grid" style={{ marginBottom: '2rem' }}>
+        <div className="metric-card" style={{ textAlign: 'center' }}>
+          <div className="metric-value">{totalCount}</div>
+          <div className="metric-title">Total Roster</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success-color)' }}>{presentCount}</div>
-          <div style={{ color: 'var(--text-secondary)' }}>Present</div>
+        <div className="metric-card" style={{ textAlign: 'center' }}>
+          <div className="metric-value" style={{ color: 'var(--success-color)' }}>{presentCount}</div>
+          <div className="metric-title">Present</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--danger-color)' }}>{totalCount - presentCount}</div>
-          <div style={{ color: 'var(--text-secondary)' }}>Absent</div>
+        <div className="metric-card" style={{ textAlign: 'center' }}>
+          <div className="metric-value" style={{ color: 'var(--danger-color)' }}>{totalCount - presentCount}</div>
+          <div className="metric-title">Absent</div>
         </div>
       </div>
 
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <h3 style={{ padding: '1.5rem', borderBottom: '1px solid var(--surface-border)' }}>Attendance Entries</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="data-table-container">
+        <h3 style={{ padding: '1.5rem', borderBottom: '1px solid var(--surface-border)', color: 'var(--galaxy-black)' }}>Attendance Entries</h3>
+        <table className="data-table">
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.02)' }}>
-              <th style={{ padding: '1rem' }}>Employee Code</th>
-              <th style={{ padding: '1rem' }}>Name</th>
-              <th style={{ padding: '1rem' }}>Status</th>
-              <th style={{ padding: '1rem' }}>Clock In</th>
-              <th style={{ padding: '1rem' }}>Clock Out</th>
-              <th style={{ padding: '1rem' }}>Total Hours</th>
+            <tr>
+              <th>Employee Code</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Clock In</th>
+              <th>Clock Out</th>
+              <th>Total Hours</th>
             </tr>
           </thead>
           <tbody>
             {session.entries?.map((entry) => (
-              <tr key={entry.id || entry.employeeId} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                <td style={{ padding: '1rem', fontWeight: '500' }}>{entry.employeeCode}</td>
-                <td style={{ padding: '1rem' }}>{entry.employeeName}</td>
-                <td style={{ padding: '1rem' }}>
+              <tr key={entry.id || entry.employeeId}>
+                <td style={{ fontWeight: '500', color: 'var(--galaxy-black)' }}>{entry.employeeCode}</td>
+                <td style={{ color: 'var(--galaxy-black)' }}>{entry.employeeName}</td>
+                <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    color: entry.status === 'Present' ? 'var(--success-color)' : 'var(--text-secondary)'
+                    color: entry.status === 'Present' ? 'var(--success-color)' : 'var(--text-secondary)',
+                    fontWeight: '500'
                   }}>
                     {entry.status === 'Present' ? <CheckCircle size={16} /> : <Clock size={16} />}
                     {entry.status}
                   </div>
                 </td>
-                <td style={{ padding: '1rem' }}>
+                <td style={{ color: 'var(--galaxy-black)' }}>
                   {entry.clockInTime ? new Date(entry.clockInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                 </td>
-                <td style={{ padding: '1rem' }}>
+                <td style={{ color: 'var(--galaxy-black)' }}>
                   {entry.clockOutTime ? new Date(entry.clockOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                 </td>
-                <td style={{ padding: '1rem', fontWeight: 'bold' }}>
+                <td style={{ fontWeight: 'bold', color: 'var(--galaxy-black)' }}>
                   {entry.totalWorkHours ? entry.totalWorkHours.toFixed(2) : '-'}
                 </td>
               </tr>
             ))}
             {(!session.entries || session.entries.length === 0) && (
               <tr>
-                <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td colSpan="6" style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                   No entries found in this session.
                 </td>
               </tr>
